@@ -10,10 +10,10 @@ services:
     plan: starter
     rootDir: ./cazar-ops-hub
     buildCommand: cd cazar-ops-hub && npm install && npm run build
-    startCommand: cd cazar-ops-hub && npm run start
+    startCommand: cd cazar-ops-hub && npm run preview -- --port $PORT --host 0.0.0.0
     envVars:
       - key: NODE_VERSION
-        value: 18
+        value: 20
       - key: DATABASE_URL
         value: postgresql://cazar_admin:7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke@dpg-d25rt60gjchc73acglmg-a.oregon-postgres.render.com/cazar_ops_hub
       - key: VITE_DATABASE_URL
@@ -25,9 +25,9 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: USE_MOCK_DATA
-        value: false
+        value: true
       - key: VITE_USE_MOCK_DATA
-        value: false
+        value: true
     healthCheckPath: /
     autoDeploy: true
     region: oregon 
