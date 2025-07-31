@@ -33,7 +33,7 @@ export class DatabaseService {
   }
 
   // Route operations
-  static async getRoutes(dateRange?: { start: Date; end: Date }): Promise<Route[]> {
+  static async getRoutes(_dateRange?: { start: Date; end: Date }): Promise<Route[]> {
     if (USE_MOCK_DATA) {
       const drivers = await this.getDrivers();
       return generateMockRoutes(drivers);
@@ -44,7 +44,7 @@ export class DatabaseService {
   }
 
   // Timecard operations
-  static async getTimecards(dateRange?: { start: Date; end: Date }): Promise<Timecard[]> {
+  static async getTimecards(_dateRange?: { start: Date; end: Date }): Promise<Timecard[]> {
     if (USE_MOCK_DATA) {
       const routes = await this.getRoutes();
       return generateMockTimecards(routes);
