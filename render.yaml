@@ -2,7 +2,10 @@ databases:
   - name: cazar-db
     databaseName: cazar_ops_hub
     user: cazar_admin
-    plan: standard # New Render database plan
+    region: oregon
+    # Using the new Render database plan format
+    # Options: mini, small, medium, large, xl, 2xl, 4xl, 8xl
+    size: mini # Smallest paid plan for PostgreSQL
     ipAllowList: [] # Allow connections from anywhere (configure for security in production)
 
 services:
