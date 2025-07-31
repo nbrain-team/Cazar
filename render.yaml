@@ -2,7 +2,7 @@ databases:
   - name: cazar-db
     databaseName: cazar_ops_hub
     user: cazar_admin
-    plan: starter # Paid tier for reliable performance
+    plan: standard # New Render database plan
     ipAllowList: [] # Allow connections from anywhere (configure for security in production)
 
 services:
