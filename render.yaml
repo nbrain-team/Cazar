@@ -1,0 +1,33 @@
+databases:
+  - name: cazar-db
+    databaseName: cazar_ops_hub
+    user: cazar_admin
+
+services:
+  - type: web
+    name: cazar-ops-hub
+    runtime: node
+    plan: starter
+    rootDir: ./cazar-ops-hub
+    buildCommand: cd cazar-ops-hub && npm install && npm run build
+    startCommand: cd cazar-ops-hub && npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: DATABASE_URL
+        value: postgresql://cazar_admin:7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke@dpg-d25rt60gjchc73acglmg-a.oregon-postgres.render.com/cazar_ops_hub
+      - key: VITE_DATABASE_URL
+        value: postgresql://cazar_admin:7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke@dpg-d25rt60gjchc73acglmg-a.oregon-postgres.render.com/cazar_ops_hub
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: USE_MOCK_DATA
+        value: false
+      - key: VITE_USE_MOCK_DATA
+        value: false
+    healthCheckPath: /
+    autoDeploy: true
+    region: oregon 
