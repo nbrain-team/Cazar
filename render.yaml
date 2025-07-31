@@ -2,17 +2,12 @@ databases:
   - name: cazar-db
     databaseName: cazar_ops_hub
     user: cazar_admin
-    region: oregon
-    # Using the new Render database plan format
-    # Options: mini, small, medium, large, xl, 2xl, 4xl, 8xl
-    size: mini # Smallest paid plan for PostgreSQL
-    ipAllowList: [] # Allow connections from anywhere (configure for security in production)
 
 services:
   - type: web
     name: cazar-ops-hub
     runtime: node
-    plan: starter # Paid tier to prevent sleep and ensure reliability
+    plan: starter
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
@@ -31,4 +26,4 @@ services:
     healthCheckPath: /
     autoDeploy: true
     rootDir: cazar-ops-hub
-    region: oregon # You can change to ohio if preferred 
+    region: oregon 
