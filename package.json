@@ -1,0 +1,41 @@
+{
+  "name": "cazar-ops-hub",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "start": "vite preview --port $PORT --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-select": "^2.2.5",
+    "@radix-ui/react-tabs": "^1.1.12",
+    "@radix-ui/themes": "^3.2.1",
+    "@tanstack/react-query": "^5.83.1",
+    "axios": "^1.11.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.535.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.7.1",
+    "recharts": "^3.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/react-router-dom": "^5.3.3",
+    "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9.30.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.35.1",
+    "vite": "^7.0.4"
+  }
+}
