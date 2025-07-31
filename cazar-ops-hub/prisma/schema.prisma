@@ -1,0 +1,155 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Driver {
+  driverId         String    @id @map("driver_id")
+  driverName       String    @map("driver_name")
+  driverStatus     String    @map("driver_status")
+  employmentStatus String    @map("employment_status")
+  jobTitle         String?   @map("job_title")
+  payType          String?   @map("pay_type")
+  payRate          Decimal?  @map("pay_rate") @db.Decimal(10, 2)
+  department       String?
+  location         String?
+  email            String?   @unique
+  phone            String?
+  hireDate         DateTime? @map("hire_date")
+  licenseNumber    String?   @map("license_number")
+  licenseExpiry    DateTime? @map("license_expiry")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  routes         Route[]
+  timecards      Timecard[]
+  schedules      Schedule[]
+  scorecards     Scorecard[]
+  discrepancies  TimecardDiscrepancy[]
+
+  @@map("drivers")
+}
+
+model Route {
+  routeId              String   @id @map("route_id")
+  routeDate            DateTime @map("route_date") @db.Date
+  driverId             String   @map("driver_id")
+  routeStartTime       DateTime @map("route_start_time") @db.Time
+  routeEndTime         DateTime @map("route_end_time") @db.Time
+  routeCompletionStatus String  @map("route_completion_status")
+  routeLocationId      String?  @map("route_location_id")
+  vehicleType          String?  @map("vehicle_type")
+  totalStops           Int?     @map("total_stops")
+  totalPackages        Int?     @map("total_packages")
+  packagesDelivered    Int?     @map("packages_delivered")
+  packagesUndelivered  Int?     @map("packages_undelivered")
+  flexAppCheckInTime   DateTime? @map("flex_app_check_in_time") @db.Time
+  flexAppCheckOutTime  DateTime? @map("flex_app_check_out_time") @db.Time
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  driver Driver @relation(fields: [driverId], references: [driverId])
+
+  @@map("routes")
+}
+
+model Timecard {
+  timecardId         String    @id @map("timecard_id")
+  employeeId         String    @map("employee_id")
+  clockInTime        DateTime  @map("clock_in_time")
+  clockOutTime       DateTime? @map("clock_out_time")
+  breakStartTime     DateTime? @map("break_start_time")
+  breakEndTime       DateTime? @map("break_end_time")
+  totalHoursWorked   Decimal?  @map("total_hours_worked") @db.Decimal(5, 2)
+  overtimeHours      Decimal?  @map("overtime_hours") @db.Decimal(5, 2)
+  shiftId            String?   @map("shift_id")
+  scheduledShiftStart DateTime? @map("scheduled_shift_start")
+  scheduledShiftEnd   DateTime? @map("scheduled_shift_end")
+  date               DateTime  @db.Date
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  driver Driver @relation(fields: [employeeId], references: [driverId])
+
+  @@map("timecards")
+}
+
+model Schedule {
+  scheduleId      String   @id @map("schedule_id")
+  driverId        String   @map("driver_id")
+  shiftDate       DateTime @map("shift_date") @db.Date
+  shiftStart      DateTime @map("shift_start") @db.Time
+  shiftEnd        DateTime @map("shift_end") @db.Time
+  assignedVehicle String?  @map("assigned_vehicle")
+  assignedRoute   String?  @map("assigned_route")
+  scheduledBreaks String[] @map("scheduled_breaks")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  driver Driver @relation(fields: [driverId], references: [driverId])
+
+  @@map("schedules")
+}
+
+model Scorecard {
+  scorecardId          String   @id @default(uuid()) @map("scorecard_id")
+  scorecardWeek        DateTime @map("scorecard_week") @db.Date
+  driverId             String   @map("driver_id")
+  onTimeDeliveryRate   Decimal? @map("on_time_delivery_rate") @db.Decimal(5, 2)
+  deliveryAttemptRate  Decimal? @map("delivery_attempt_rate") @db.Decimal(5, 2)
+  safeDrivingScore     Decimal? @map("safe_driving_score") @db.Decimal(5, 2)
+  customerFeedbackScore Decimal? @map("customer_feedback_score") @db.Decimal(3, 2)
+  routeCompletionRate  Decimal? @map("route_completion_rate") @db.Decimal(5, 2)
+  bonusEligibility     Boolean  @default(false) @map("bonus_eligibility")
+  bonusAmountPotential Decimal? @map("bonus_amount_potential") @db.Decimal(10, 2)
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  driver Driver @relation(fields: [driverId], references: [driverId])
+
+  @@map("scorecards")
+}
+
+model TimecardDiscrepancy {
+  id          String    @id @default(uuid())
+  driverId    String    @map("driver_id")
+  driverName  String?   @map("driver_name")
+  date        DateTime  @db.Date
+  type        String
+  severity    String
+  description String?
+  adpHours    Decimal?  @map("adp_hours") @db.Decimal(5, 2)
+  amazonHours Decimal?  @map("amazon_hours") @db.Decimal(5, 2)
+  variance    Decimal?  @db.Decimal(5, 2)
+  status      String    @default("pending")
+  resolvedBy  String?   @map("resolved_by")
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  driver Driver @relation(fields: [driverId], references: [driverId])
+
+  @@map("timecard_discrepancies")
+}
+
+model User {
+  id         String    @id @default(uuid())
+  email      String    @unique
+  passwordHash String   @map("password_hash")
+  name       String
+  role       String    @default("dispatcher")
+  isActive   Boolean   @default(true) @map("is_active")
+  lastLogin  DateTime? @map("last_login")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
