@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar, TrendingUp, DollarSign, Clock, Users, Package, AlertTriangle, FileText } from 'lucide-react';
-import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
+import { TrendingUp, DollarSign, Clock, Users, Package, AlertTriangle, FileText } from 'lucide-react';
 
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState('week');
@@ -189,7 +188,7 @@ export default function ReportsPage() {
                     fill="#8884d8"
                     dataKey="amount"
                   >
-                    {payrollData.map((entry, index) => (
+                    {payrollData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

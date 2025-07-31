@@ -66,7 +66,7 @@ export default function TimecardPage() {
   // Calculate summary stats
   const totalDiscrepancies = discrepancies.length;
   const highSeverity = discrepancies.filter(d => d.severity === 'high').length;
-  const totalVarianceHours = discrepancies.reduce((sum, d) => sum + d.variance, 0);
+  const totalVarianceHours = discrepancies.reduce((sum, d) => sum + (d.variance || 0), 0);
   const resolvedToday = discrepancies.filter(d => d.status === 'resolved').length;
 
   return (
@@ -231,14 +231,14 @@ export default function TimecardPage() {
                   <td>{new Date(disc.date).toLocaleDateString()}</td>
                   <td>{disc.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
                   <td style={{ maxWidth: '300px', fontSize: '0.875rem' }}>{disc.description}</td>
-                  <td>{disc.adp_hours.toFixed(2)}</td>
-                  <td>{disc.amazon_hours.toFixed(2)}</td>
+                  <td>{(disc.adp_hours || 0).toFixed(2)}</td>
+                  <td>{(disc.amazon_hours || 0).toFixed(2)}</td>
                   <td>
                     <span style={{ 
-                      color: disc.variance > 0.5 ? 'var(--danger)' : 'var(--warning)',
+                      color: (disc.variance || 0) > 0.5 ? 'var(--danger)' : 'var(--warning)',
                       fontWeight: 500
                     }}>
-                      {disc.variance.toFixed(2)} hrs
+                      {(disc.variance || 0).toFixed(2)} hrs
                     </span>
                   </td>
                   <td>
@@ -263,16 +263,18 @@ export default function TimecardPage() {
                     {disc.status === 'pending' && (
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button 
-                          className="btn btn-primary" 
-                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}
-                          onClick={() => resolveDiscrepancy(disc.id)}
+                          className="btn btn-secondary" 
+                          style={{ padding: '0.25rem 0.5rem' }}
+                          onClick={() => disc.id && resolveDiscrepancy(disc.id)}
+                          disabled={!disc.id}
                         >
                           Resolve
                         </button>
                         <button 
                           className="btn btn-secondary" 
-                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}
-                          onClick={() => escalateDiscrepancy(disc.id)}
+                          style={{ padding: '0.25rem 0.5rem' }}
+                          onClick={() => disc.id && escalateDiscrepancy(disc.id)}
+                          disabled={!disc.id}
                         >
                           Escalate
                         </button>

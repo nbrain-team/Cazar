@@ -50,9 +50,14 @@ export const generateMockRoutes = (drivers: Driver[]): Route[] => {
           flex_app_check_out_time: `${(startHour + duration).toString().padStart(2, '0')}:${Math.floor(Math.random() * 30).toString().padStart(2, '0')}:00`
         });
         
-        // Set delivered packages
-        routes[routes.length - 1].packages_delivered = Math.floor(routes[routes.length - 1].total_packages * (0.85 + Math.random() * 0.15));
-        routes[routes.length - 1].packages_undelivered = routes[routes.length - 1].total_packages - routes[routes.length - 1].packages_delivered;
+        // Simulate some incomplete deliveries
+        if (Math.random() < 0.1) {
+          const lastRoute = routes[routes.length - 1];
+          if (lastRoute && lastRoute.total_packages) {
+            lastRoute.packages_delivered = Math.floor(lastRoute.total_packages * (0.85 + Math.random() * 0.15));
+            lastRoute.packages_undelivered = lastRoute.total_packages - (lastRoute.packages_delivered || 0);
+          }
+        }
       }
     });
   }

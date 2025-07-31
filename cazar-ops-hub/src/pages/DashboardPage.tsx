@@ -33,10 +33,10 @@ export default function DashboardPage() {
 
   // Calculate stats
   const activeDrivers = drivers.filter(d => d.driver_status === 'active').length;
-  const totalPackagesDelivered = routes.reduce((sum, r) => sum + r.packages_delivered, 0);
-  const avgDeliveryRate = routes.length > 0 
-    ? routes.reduce((sum, r) => sum + (r.packages_delivered / r.total_packages), 0) / routes.length * 100
-    : 0;
+  const totalPackages = routes.reduce((sum, r) => sum + (r.packages_delivered || 0), 0);
+  const onTimeDeliveryRate = routes.length > 0 
+    ? (routes.filter(r => (r.packages_delivered || 0) / (r.total_packages || 1) >= 0.95).length / routes.length * 100).toFixed(1)
+    : '0';
   const pendingDiscrepancies = discrepancies.filter(d => d.status === 'pending').length;
 
   // Prepare chart data
@@ -48,7 +48,7 @@ export default function DashboardPage() {
     
     return {
       date: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      packages: dayRoutes.reduce((sum, r) => sum + r.packages_delivered, 0),
+      packages: dayRoutes.reduce((sum, r) => sum + (r.packages_delivered || 0), 0),
       routes: dayRoutes.length
     };
   }).reverse();
@@ -88,10 +88,10 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h3>Packages Delivered</h3>
-              <div className="value">{totalPackagesDelivered.toLocaleString()}</div>
+              <div className="value">{totalPackages.toLocaleString()}</div>
               <div className="change positive">
                 <TrendingUp size={16} style={{ display: 'inline', marginRight: '4px' }} />
-                {avgDeliveryRate.toFixed(1)}% delivery rate
+                {onTimeDeliveryRate}% delivery rate
               </div>
             </div>
             <Package size={24} color="var(--success)" />
@@ -197,7 +197,9 @@ export default function DashboardPage() {
                   <td>{disc.driver_name}</td>
                   <td>{new Date(disc.date).toLocaleDateString()}</td>
                   <td>{disc.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
-                  <td>{disc.variance.toFixed(2)} hrs</td>
+                  <td>{disc.adp_hours || 0} hrs</td>
+                  <td>{disc.amazon_hours || 0} hrs</td>
+                  <td>{(disc.variance || 0).toFixed(2)} hrs</td>
                   <td>
                     <span className={`badge badge-${
                       disc.severity === 'high' ? 'danger' : 

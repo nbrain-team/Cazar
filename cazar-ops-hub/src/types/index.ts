@@ -22,27 +22,27 @@ export interface Route {
   driver_id: string;
   route_start_time: string;
   route_end_time: string;
-  route_completion_status: 'completed' | 'partial' | 'failed';
-  route_location_id: string;
-  vehicle_type: 'van' | 'e-bike' | 'car';
-  total_stops: number;
-  total_packages: number;
-  packages_delivered: number;
-  packages_undelivered: number;
-  flex_app_check_in_time: string;
-  flex_app_check_out_time: string;
+  route_completion_status: string;  // Changed from specific union type
+  route_location_id?: string;
+  vehicle_type?: string;
+  total_stops?: number;
+  total_packages?: number;
+  packages_delivered?: number;
+  packages_undelivered?: number;
+  flex_app_check_in_time?: string;
+  flex_app_check_out_time?: string;
 }
 
 export interface Scorecard {
   scorecard_week: string;
   driver_id: string;
-  on_time_delivery_rate: number;
-  delivery_attempt_rate: number;
-  safe_driving_score: number;
-  customer_feedback_score: number;
-  route_completion_rate: number;
+  on_time_delivery_rate?: number;
+  delivery_attempt_rate?: number;
+  safe_driving_score?: number;
+  customer_feedback_score?: number;
+  route_completion_rate?: number;
   bonus_eligibility: boolean;
-  bonus_amount_potential: number;
+  bonus_amount_potential?: number;
 }
 
 // ADP Types
@@ -55,7 +55,7 @@ export interface Timecard {
   break_end_time: string;
   total_hours_worked: number;
   overtime_hours: number;
-  shift_id: string;
+  shift_id?: string;
   scheduled_shift_start: string;
   scheduled_shift_end: string;
   date: string;
@@ -78,8 +78,8 @@ export interface Schedule {
   shift_date: string;
   shift_start: string;
   shift_end: string;
-  assigned_vehicle: string;
-  assigned_route: string;
+  assigned_vehicle?: string;
+  assigned_route?: string;
   scheduled_breaks: string[];
 }
 
