@@ -12,6 +12,7 @@ import TimecardPage from './pages/TimecardPage';
 import SchedulingPage from './pages/SchedulingPage';
 import DriversPage from './pages/DriversPage';
 import ReportsPage from './pages/ReportsPage';
+import PayrollPage from './pages/PayrollPage';
 import SettingsPage from './pages/SettingsPage';
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ function App() {
                       <Route path="/scheduling" element={<SchedulingPage />} />
                       <Route path="/drivers" element={<DriversPage />} />
                       <Route path="/reports" element={<ReportsPage />} />
+                      <Route path="/payroll" element={<PayrollPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" />} />
                     </Routes>

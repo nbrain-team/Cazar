@@ -31,3 +31,6 @@ dist-ssr
 # Build files
 build/
 .cache/
+
+# Payroll data files
+payrolldata/
