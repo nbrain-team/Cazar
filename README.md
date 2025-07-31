@@ -37,35 +37,90 @@ npm run build
 
 ## Deployment on Render
 
-### Prerequisites
-1. Push this code to a GitHub repository
-2. Create a Render account at https://render.com
+### Method 1: Blueprint Deployment (Recommended)
 
-### Render Setup Instructions
+This method automatically creates both the web service and PostgreSQL database.
 
-1. **Create New Web Service**:
-   - Go to Render Dashboard
-   - Click "New +" → "Web Service"
+1. **Fork/Clone the Repository**
+   - Ensure the code is in your GitHub account
+
+2. **Deploy with Blueprint**
+   - Go to [Render Dashboard](https://dashboard.render.com)
+   - Click "New +" → "Blueprint"
    - Connect your GitHub repository
+   - Select the `nbrain-team/Cazar` repository
+   - Render will detect the `render.yaml` file
+   - Click "Apply"
 
-2. **Configure Build Settings**:
-   - **Name**: cazar-ops-hub
-   - **Environment**: Node
+3. **What Gets Created**:
+   - PostgreSQL database (cazar-db)
+   - Web service (cazar-ops-hub)
+   - All environment variables
+   - Automatic deployments on git push
+
+### Method 2: Manual Deployment
+
+If you prefer to set up services manually:
+
+1. **Create PostgreSQL Database**:
+   - New → PostgreSQL
+   - Name: `cazar-db`
+   - Database: `cazar_ops_hub`
+   - User: `cazar_admin`
+   - Region: Same as your web service
+   - Plan: Free (upgrade for production)
+
+2. **Create Web Service**:
+   - New → Web Service
+   - Connect GitHub repository
+   - **Root Directory**: `cazar-ops-hub`
    - **Build Command**: `npm install && npm run build`
    - **Start Command**: `npm run start`
-   - **Publish Directory**: `dist`
 
 3. **Environment Variables**:
-   Add the following environment variables in Render:
    ```
    NODE_VERSION=18
+   DATABASE_URL=[automatically set from database]
+   NODE_ENV=production
+   JWT_SECRET=[generate a random string]
+   SESSION_SECRET=[generate a random string]
    ```
 
-4. **Advanced Settings**:
-   - **Auto-Deploy**: Yes (for automatic deployments on git push)
-   - **Health Check Path**: /
+### Database Setup
 
-### API Integration (Future)
+After deployment, initialize the database:
+
+1. **Access Database**:
+   - Go to your database in Render
+   - Click "Connect" → "PSQL Command"
+   - Copy and run the command in your terminal
+
+2. **Run Schema**:
+   ```bash
+   psql [connection-string] < database/schema.sql
+   ```
+
+3. **Create Admin User** (optional):
+   ```sql
+   INSERT INTO users (email, password_hash, name, role) 
+   VALUES ('admin@cazar.com', '[hashed-password]', 'Admin User', 'admin');
+   ```
+
+### Environment Variables Reference
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `NODE_VERSION` | Node.js version (18) | Yes |
+| `NODE_ENV` | Environment (production) | Yes |
+| `JWT_SECRET` | Secret for JWT tokens | Yes |
+| `SESSION_SECRET` | Secret for sessions | Yes |
+| `AMAZON_API_KEY` | Amazon Logistics API key | No (future) |
+| `ADP_API_KEY` | ADP API key | No (future) |
+| `DSP_WORKPLACE_API_KEY` | DSP Workplace API key | No (future) |
+| `USE_MOCK_DATA` | Force mock data (true/false) | No |
+
+## API Integration (Future)
 
 The platform is designed to integrate with:
 - **Amazon Logistics API**: Route and performance data
@@ -89,7 +144,26 @@ src/
 ├── services/      # API and data services
 ├── types/         # TypeScript type definitions
 └── utils/         # Utility functions
+
+database/
+└── schema.sql     # PostgreSQL database schema
 ```
+
+## Production Considerations
+
+1. **Upgrade Plans**: 
+   - Database: Starter ($7/month) for better performance
+   - Web Service: Starter ($7/month) to prevent sleep
+
+2. **Security**:
+   - Change default passwords
+   - Set strong JWT_SECRET and SESSION_SECRET
+   - Enable SSL (automatic on Render)
+
+3. **Monitoring**:
+   - Set up health checks
+   - Configure alerts in Render
+   - Monitor database performance
 
 ## Future Enhancements
 
