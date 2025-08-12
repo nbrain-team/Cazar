@@ -4,6 +4,7 @@ import { ComplianceService } from '../services/complianceService';
 import { WhcService } from '../services/whcService';
 import type { ComplianceRule, DspDriverWeeklyMetric, Violation } from '../types';
 import type { WorkHoursAuditDaily } from '../types';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 function KPI({ label, value }: { label: string; value: string | number }) {
   return (
@@ -14,6 +15,27 @@ function KPI({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
+  const headers = Array.from(rows.reduce((set, row) => { Object.keys(row).forEach(k => set.add(k)); return set; }, new Set<string>())) as string[];
+  const csv = [headers.join(',')].concat(
+    rows.map(r => headers.map(h => {
+      const v = (r as any)[h];
+      if (v === null || v === undefined) return '';
+      const s = String(v).replaceAll('"', '""');
+      return s.includes(',') || s.includes('"') ? `"${s}"` : s;
+    }).join(','))
+  ).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function CompliancePage() {
   const [station, setStation] = useState<string>('DYY5');
   const [week, setWeek] = useState<string>('2025-29');
@@ -22,6 +44,8 @@ export default function CompliancePage() {
   const [rules, setRules] = useState<ComplianceRule[]>([]);
   const [auditDate, setAuditDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [whcAudit, setWhcAudit] = useState<WorkHoursAuditDaily[]>([]);
+  const [editingRuleKey, setEditingRuleKey] = useState<string | null>(null);
+  const [thresholdDraft, setThresholdDraft] = useState<string>('');
 
   useEffect(() => {
     ComplianceService.getWeeklyMetrics({ station_code: station, week_code: week }).then(setMetrics);
@@ -40,6 +64,41 @@ export default function CompliancePage() {
     const atRisk = metrics.filter(m => (m.speeding_event_rate || 0) > 0 || (m.distractions_rate || 0) > 0 || (m.seatbelt_off_rate || 0) > 0).length;
     return { openViolations, avgSeatbeltOff, avgSpeedingRate, avgCdfDpmo, atRisk };
   }, [metrics, violations]);
+
+  const trendData = useMemo(() => {
+    return metrics.map(m => ({
+      transporter: m.transporter_id,
+      dcr: m.dcr ?? 0,
+      cdf: m.cdf_dpmo ?? 0,
+      swcpod: m.swc_pod ?? 0
+    }));
+  }, [metrics]);
+
+  const acknowledge = async (v: Violation) => {
+    await ComplianceService.acknowledgeViolation(v.id || `${v.transporter_id}-${v.metric_key}`);
+    const updated = await ComplianceService.getViolations({ station_code: station });
+    setViolations(updated);
+  };
+
+  const resolve = async (v: Violation) => {
+    await ComplianceService.resolveViolation(v.id || `${v.transporter_id}-${v.metric_key}`);
+    const updated = await ComplianceService.getViolations({ station_code: station });
+    setViolations(updated);
+  };
+
+  const startEditRule = (r: ComplianceRule) => {
+    setEditingRuleKey(`${r.metric_key}-${r.window}`);
+    setThresholdDraft(String(r.threshold_value));
+  };
+
+  const saveRule = async (r: ComplianceRule) => {
+    const t = Number(thresholdDraft);
+    const updated: ComplianceRule = { ...r, threshold_value: isNaN(t) ? r.threshold_value : t };
+    await ComplianceService.updateRule(updated);
+    const refreshed = await ComplianceService.getRules();
+    setRules(refreshed);
+    setEditingRuleKey(null);
+  };
 
   return (
     <div style={{ padding: '2rem' }}>
@@ -73,13 +132,27 @@ export default function CompliancePage() {
             <KPI label="AVG CDF DPMO" value={kpis.avgCdfDpmo.toFixed(1)} />
           </div>
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
-            <h3>Weekly Trends</h3>
-            <p>Charts will show DCR, SWC-POD, CDF DPMO trends (mock placeholder).</p>
+            <h3 style={{ marginBottom: '0.5rem' }}>Weekly Trends</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="transporter" hide />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="dcr" stroke="#3b82f6" name="DCR" />
+                <Line type="monotone" dataKey="swcpod" stroke="#10b981" name="SWC-POD" />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </Tabs.Content>
 
         <Tabs.Content value="drivers">
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0 }}>Drivers</h3>
+              <button className="btn btn-secondary" onClick={() => downloadCsv(`${station}-${week}-drivers.csv`, metrics as unknown as Record<string, unknown>[])}>Export CSV</button>
+            </div>
             <table className="table">
               <thead>
                 <tr>
@@ -117,6 +190,10 @@ export default function CompliancePage() {
 
         <Tabs.Content value="violations">
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0 }}>Violations</h3>
+              <button className="btn btn-secondary" onClick={() => downloadCsv(`${station}-${week}-violations.csv`, violations as unknown as Record<string, unknown>[])}>Export CSV</button>
+            </div>
             <table className="table">
               <thead>
                 <tr>
@@ -126,6 +203,7 @@ export default function CompliancePage() {
                   <th>THRESHOLD</th>
                   <th>SEVERITY</th>
                   <th>STATUS</th>
+                  <th>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -137,6 +215,10 @@ export default function CompliancePage() {
                     <td>{v.threshold_value}</td>
                     <td>{v.severity}</td>
                     <td>{v.status}</td>
+                    <td style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="btn btn-secondary" onClick={() => acknowledge(v)}>Ack</button>
+                      <button className="btn btn-primary" onClick={() => resolve(v)}>Resolve</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -155,19 +237,37 @@ export default function CompliancePage() {
                   <th>WINDOW</th>
                   <th>SEVERITY</th>
                   <th>ACTIVE</th>
+                  <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
-                {rules.map(r => (
-                  <tr key={`${r.metric_key}-${r.window}`}>
-                    <td>{r.metric_key}</td>
-                    <td>{r.operator}</td>
-                    <td>{r.threshold_value}</td>
-                    <td>{r.window}</td>
-                    <td>{r.severity}</td>
-                    <td>{r.active ? 'Yes' : 'No'}</td>
-                  </tr>
-                ))}
+                {rules.map(r => {
+                  const key = `${r.metric_key}-${r.window}`;
+                  const isEditing = editingRuleKey === key;
+                  return (
+                    <tr key={key}>
+                      <td>{r.metric_key}</td>
+                      <td>{r.operator}</td>
+                      <td>
+                        {isEditing ? (
+                          <input className="input" value={thresholdDraft} onChange={e => setThresholdDraft(e.target.value)} style={{ maxWidth: 120 }} />
+                        ) : (
+                          r.threshold_value
+                        )}
+                      </td>
+                      <td>{r.window}</td>
+                      <td>{r.severity}</td>
+                      <td>{r.active ? 'Yes' : 'No'}</td>
+                      <td style={{ display: 'flex', gap: '0.5rem' }}>
+                        {isEditing ? (
+                          <button className="btn btn-primary" onClick={() => saveRule(r)}>Save</button>
+                        ) : (
+                          <button className="btn btn-secondary" onClick={() => startEditRule(r)}>Edit</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -188,6 +288,7 @@ export default function CompliancePage() {
         <Tabs.Content value="whc">
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center' }}>
             <label>Date: <input className="input" type="date" value={auditDate} onChange={e => setAuditDate(e.target.value)} /></label>
+            <button className="btn btn-secondary" onClick={() => downloadCsv(`${station}-${auditDate}-payroll-guard.csv`, whcAudit as unknown as Record<string, unknown>[])}>Export Payroll Guard CSV</button>
           </div>
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
             <table className="table">
