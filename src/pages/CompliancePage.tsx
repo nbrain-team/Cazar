@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Tabs } from '@radix-ui/themes';
 import { ComplianceService } from '../services/complianceService';
+import { WhcService } from '../services/whcService';
 import type { ComplianceRule, DspDriverWeeklyMetric, Violation } from '../types';
+import type { WorkHoursAuditDaily } from '../types';
 
 function KPI({ label, value }: { label: string; value: string | number }) {
   return (
@@ -18,12 +20,15 @@ export default function CompliancePage() {
   const [metrics, setMetrics] = useState<DspDriverWeeklyMetric[]>([]);
   const [violations, setViolations] = useState<Violation[]>([]);
   const [rules, setRules] = useState<ComplianceRule[]>([]);
+  const [auditDate, setAuditDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [whcAudit, setWhcAudit] = useState<WorkHoursAuditDaily[]>([]);
 
   useEffect(() => {
     ComplianceService.getWeeklyMetrics({ station_code: station, week_code: week }).then(setMetrics);
     ComplianceService.getViolations({ station_code: station }).then(setViolations);
     ComplianceService.getRules().then(setRules);
-  }, [station, week]);
+    WhcService.computeDailyAudit(station, auditDate).then(setWhcAudit);
+  }, [station, week, auditDate]);
 
   const kpis = useMemo(() => {
     const openViolations = violations.filter(v => v.status === 'open').length;
@@ -56,6 +61,7 @@ export default function CompliancePage() {
           <Tabs.Trigger value="violations">VIOLATIONS</Tabs.Trigger>
           <Tabs.Trigger value="rules">RULES</Tabs.Trigger>
           <Tabs.Trigger value="scorecards">SCORECARDS</Tabs.Trigger>
+          <Tabs.Trigger value="whc">WORK HOURS</Tabs.Trigger>
         </Tabs.List>
 
         <Tabs.Content value="overview">
@@ -176,6 +182,48 @@ export default function CompliancePage() {
                 <li key={`${m.transporter_id}-score`}>{m.transporter_id}: DCR {m.dcr ?? 0}, SWC-POD {m.swc_pod ?? 0}, CDF DPMO {m.cdf_dpmo ?? 0}</li>
               ))}
             </ul>
+          </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="whc">
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center' }}>
+            <label>Date: <input className="input" type="date" value={auditDate} onChange={e => setAuditDate(e.target.value)} /></label>
+          </div>
+          <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>DRIVER</th>
+                  <th>SHIFT START</th>
+                  <th>SHIFT END</th>
+                  <th>ON-DUTY HOURS</th>
+                  <th>MEAL (MIN)</th>
+                  <th>MEAL IN WINDOW</th>
+                  <th>DAILY MAX?</th>
+                  <th>5TH/6TH DAY?</th>
+                  <th>WEEKLY HOURS</th>
+                  <th>WEEKLY OT?</th>
+                  <th>VERDICT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {whcAudit.map(a => (
+                  <tr key={`${a.driver_name}-${a.work_date}`}>
+                    <td>{a.driver_name}</td>
+                    <td>{a.shift_start ? new Date(a.shift_start).toLocaleTimeString() : ''}</td>
+                    <td>{a.shift_end ? new Date(a.shift_end).toLocaleTimeString() : ''}</td>
+                    <td>{a.on_duty_hours?.toFixed(2)}</td>
+                    <td>{a.meal_minutes}</td>
+                    <td>{a.meal_within_window ? 'Yes' : 'No'}</td>
+                    <td>{a.daily_max_exceeded ? 'Yes' : 'No'}</td>
+                    <td>{a.fifth_sixth_day_flag ? 'Yes' : 'No'}</td>
+                    <td>{a.weekly_hours?.toFixed(2)}</td>
+                    <td>{a.weekly_ot_flag ? 'Yes' : 'No'}</td>
+                    <td>{a.verdict}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Tabs.Content>
       </Tabs.Root>

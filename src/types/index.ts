@@ -212,3 +212,37 @@ export interface Violation {
   status: 'open' | 'acknowledged' | 'resolved' | 'escalated';
   rule_id?: string;
 } 
+
+// WORK HOURS (WHC)
+export interface WorkHoursPolicyProfile {
+  id?: string;
+  station_code: string;
+  state_code: string;
+  min_meal_minutes: number;
+  meal_window_start_minute: number;
+  meal_window_end_minute: number;
+  min_rest_hours_between_shifts: number;
+  max_daily_on_duty_hours: number;
+  max_weekly_hours: number;
+}
+
+export interface WorkHoursAuditDaily {
+  id?: string;
+  work_date: string;
+  station_code: string;
+  position_id?: string;
+  transporter_id?: string;
+  driver_name?: string;
+  shift_start?: string;
+  shift_end?: string;
+  on_duty_hours?: number;
+  meal_minutes?: number;
+  meal_within_window?: boolean;
+  short_rest_flag?: boolean;
+  daily_max_exceeded?: boolean;
+  fifth_sixth_day_flag?: boolean;
+  weekly_hours?: number;
+  weekly_ot_flag?: boolean;
+  verdict: 'PASS' | 'WARN' | 'FAIL';
+  reasons?: string[];
+} 

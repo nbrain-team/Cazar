@@ -46,4 +46,21 @@ VALUES
 INSERT INTO driver_violations (transporter_id, station_code, metric_key, observed_value, threshold_value, severity, occurred_week, status)
 VALUES
   ('A1UPD0VQ5XF9L','VNY1','speeding_event_rate',0.002,0.000,'high','2025-29','open'),
-  ('A1TYMBVD1U5VKQ','DYY5','customer_escalation_defect',2.000,0.000,'high','2025-29','open'); 
+  ('A1TYMBVD1U5VKQ','DYY5','customer_escalation_defect',2.000,0.000,'high','2025-29','open');
+
+-- WHC Policy (NYS defaults for DYY5 and VNY1)
+INSERT INTO work_hours_policy_profiles (station_code, state_code, min_meal_minutes, meal_window_start_minute, meal_window_end_minute, min_rest_hours_between_shifts, max_daily_on_duty_hours, max_weekly_hours)
+VALUES
+  ('DYY5','NY',30,240,360,10.00,12.00,60.00),
+  ('VNY1','NY',30,240,360,10.00,12.00,60.00)
+ON CONFLICT DO NOTHING;
+
+-- WHC Audit examples (mock)
+INSERT INTO work_hours_audit_daily (
+  work_date, station_code, position_id, transporter_id, driver_name, shift_start, shift_end,
+  on_duty_hours, meal_minutes, meal_within_window, short_rest_flag, daily_max_exceeded,
+  fifth_sixth_day_flag, weekly_hours, weekly_ot_flag, verdict, reasons
+)
+VALUES
+  (CURRENT_DATE - INTERVAL '1 day','DYY5','LSW001376','A1UPD0VQ5XF9L','KAMAU OMARI ADAMS', CURRENT_DATE - INTERVAL '1 day' + TIME '03:30', CURRENT_DATE - INTERVAL '1 day' + TIME '14:10', 10.67, 30, TRUE, FALSE, FALSE, FALSE, 42.50, FALSE, 'PASS', ARRAY['All within policy']),
+  (CURRENT_DATE - INTERVAL '1 day','DYY5','LSW001052','A1TYMBVD1U5VKQ','KEVIN LOPEZ EUSEBIO', CURRENT_DATE - INTERVAL '1 day' + TIME '06:45', CURRENT_DATE - INTERVAL '1 day' + TIME '19:30', 12.75, 20, FALSE, FALSE, TRUE, TRUE, 58.25, TRUE, 'FAIL', ARRAY['Meal short (<30)','Meal outside window','Daily > 12h','5th/6th day','Weekly OT risk']); 

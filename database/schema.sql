@@ -326,3 +326,45 @@ CREATE TABLE IF NOT EXISTS payroll_adjustments (
 );
 
 -- End COMPLIANCE MODULE TABLES 
+
+-- WORK HOURS (WHC) GUARD TABLES
+CREATE TABLE IF NOT EXISTS work_hours_policy_profiles (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    station_code VARCHAR(20) NOT NULL,
+    state_code VARCHAR(10) NOT NULL,
+    min_meal_minutes INTEGER NOT NULL,
+    meal_window_start_minute INTEGER NOT NULL, -- minutes after shift start when meal window opens
+    meal_window_end_minute INTEGER NOT NULL,   -- minutes after shift start when meal window closes
+    min_rest_hours_between_shifts DECIMAL(5,2) NOT NULL,
+    max_daily_on_duty_hours DECIMAL(5,2) NOT NULL,
+    max_weekly_hours DECIMAL(5,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_whc_policy_station ON work_hours_policy_profiles(station_code);
+
+CREATE TABLE IF NOT EXISTS work_hours_audit_daily (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    work_date DATE NOT NULL,
+    station_code VARCHAR(20) NOT NULL,
+    position_id VARCHAR(50),
+    transporter_id VARCHAR(50),
+    driver_name VARCHAR(150),
+    shift_start TIMESTAMP,
+    shift_end TIMESTAMP,
+    on_duty_hours DECIMAL(6,2),
+    meal_minutes DECIMAL(6,2),
+    meal_within_window BOOLEAN,
+    short_rest_flag BOOLEAN,
+    daily_max_exceeded BOOLEAN,
+    fifth_sixth_day_flag BOOLEAN,
+    weekly_hours DECIMAL(6,2),
+    weekly_ot_flag BOOLEAN,
+    verdict VARCHAR(20) CHECK (verdict IN ('PASS','WARN','FAIL')),
+    reasons TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_whc_audit_date ON work_hours_audit_daily(work_date);
+CREATE INDEX IF NOT EXISTS idx_whc_audit_station ON work_hours_audit_daily(station_code);
+-- END WORK HOURS (WHC) GUARD TABLES 
