@@ -174,3 +174,155 @@ CREATE TRIGGER update_discrepancies_updated_at BEFORE UPDATE ON timecard_discrep
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+
+-- COMPLIANCE MODULE TABLES
+
+-- Driver Identifiers: links drivers to Amazon Transporter ID and station
+CREATE TABLE IF NOT EXISTS driver_identifiers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    driver_id VARCHAR(50) REFERENCES drivers(driver_id),
+    transporter_id VARCHAR(50),
+    station_code VARCHAR(20),
+    delivery_associate_name VARCHAR(150),
+    adp_position_id VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_driver_identifiers_transporter ON driver_identifiers(transporter_id);
+CREATE INDEX IF NOT EXISTS idx_driver_identifiers_station ON driver_identifiers(station_code);
+
+-- Weekly DSP metrics at driver granularity (per station, per week)
+CREATE TABLE IF NOT EXISTS dsp_driver_weekly_metrics (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    week_code VARCHAR(20) NOT NULL, -- e.g., 2025-29
+    station_code VARCHAR(20) NOT NULL,
+    transporter_id VARCHAR(50) NOT NULL,
+    delivered_packages INTEGER,
+    overall_standing VARCHAR(50),
+    key_focus_area VARCHAR(100),
+    on_road_safety_score VARCHAR(50),
+    overall_quality_score VARCHAR(50),
+    fico VARCHAR(50),
+    acceleration VARCHAR(50),
+    braking VARCHAR(50),
+    cornering VARCHAR(50),
+    distraction VARCHAR(50),
+    seatbelt_off_rate DECIMAL(6,3),
+    speeding VARCHAR(50),
+    speeding_event_rate DECIMAL(6,3),
+    distractions_rate DECIMAL(6,3),
+    looking_at_phone VARCHAR(50),
+    talking_on_phone VARCHAR(50),
+    looking_down VARCHAR(50),
+    following_distance_rate DECIMAL(6,3),
+    sign_signal_violations_rate DECIMAL(6,3),
+    stop_sign_violations INTEGER,
+    stop_light_violations INTEGER,
+    illegal_u_turns INTEGER,
+    cdf_dpmo DECIMAL(10,3),
+    dcr DECIMAL(10,3),
+    dsb DECIMAL(10,3),
+    swc_pod DECIMAL(10,3),
+    swc_cc DECIMAL(10,3),
+    swc_ad DECIMAL(10,3),
+    dnrs INTEGER,
+    shipments_per_on_zone_hour DECIMAL(10,3),
+    pod_opps INTEGER,
+    cc_opps INTEGER,
+    customer_escalation_defect DECIMAL(10,3),
+    customer_delivery_feedback DECIMAL(10,3),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_dsp_weekly_metrics_week ON dsp_driver_weekly_metrics(week_code);
+CREATE INDEX IF NOT EXISTS idx_dsp_weekly_metrics_station ON dsp_driver_weekly_metrics(station_code);
+CREATE INDEX IF NOT EXISTS idx_dsp_weekly_metrics_transporter ON dsp_driver_weekly_metrics(transporter_id);
+
+-- Safety Events (normalized telemetry/camera events)
+CREATE TABLE IF NOT EXISTS safety_events (
+    event_id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    transporter_id VARCHAR(50) NOT NULL,
+    station_code VARCHAR(20) NOT NULL,
+    route_id VARCHAR(50),
+    type VARCHAR(20) CHECK (type IN ('seatbelt','speeding','distraction','hard_brake','collision')),
+    severity INTEGER CHECK (severity BETWEEN 1 AND 5),
+    occurred_at TIMESTAMP NOT NULL,
+    source VARCHAR(50),
+    location JSONB,
+    video_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_safety_events_time ON safety_events(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_safety_events_type ON safety_events(type);
+CREATE INDEX IF NOT EXISTS idx_safety_events_transporter ON safety_events(transporter_id);
+
+-- Compliance Rules (thresholds editable in UI)
+CREATE TABLE IF NOT EXISTS compliance_rules (
+    rule_id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    metric_key VARCHAR(100) NOT NULL, -- e.g., seatbelt_off_rate, speeding_event_rate
+    operator VARCHAR(5) CHECK (operator IN ('>','>=','=','<','<=')) NOT NULL,
+    threshold_value DECIMAL(12,4) NOT NULL,
+    window VARCHAR(20) CHECK (window IN ('daily','weekly')) NOT NULL,
+    severity VARCHAR(10) CHECK (severity IN ('low','medium','high')) NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Violations detected from metrics vs. rules
+CREATE TABLE IF NOT EXISTS driver_violations (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    transporter_id VARCHAR(50) NOT NULL,
+    station_code VARCHAR(20) NOT NULL,
+    metric_key VARCHAR(100) NOT NULL,
+    observed_value DECIMAL(12,4) NOT NULL,
+    threshold_value DECIMAL(12,4) NOT NULL,
+    severity VARCHAR(10) CHECK (severity IN ('low','medium','high')) NOT NULL,
+    occurred_week VARCHAR(20),
+    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20) CHECK (status IN ('open','acknowledged','resolved','escalated')) DEFAULT 'open',
+    rule_id UUID REFERENCES compliance_rules(rule_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_driver_violations_status ON driver_violations(status);
+CREATE INDEX IF NOT EXISTS idx_driver_violations_transporter ON driver_violations(transporter_id);
+CREATE INDEX IF NOT EXISTS idx_driver_violations_week ON driver_violations(occurred_week);
+
+-- Optional raw parity tables for ADP/variance (future ingestion)
+CREATE TABLE IF NOT EXISTS timecards_raw (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    position_id VARCHAR(50),
+    in_time TIMESTAMP,
+    out_time TIMESTAMP,
+    hours DECIMAL(6,2),
+    pay_code VARCHAR(50),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hours_variance_daily (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    position_id VARCHAR(50),
+    pay_date DATE,
+    actual_hours DECIMAL(6,2),
+    scheduled_hours DECIMAL(6,2),
+    variance DECIMAL(6,2),
+    worked_type VARCHAR(50),
+    payroll_hours DECIMAL(6,2),
+    payroll_earnings VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payroll_adjustments (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    position_id VARCHAR(50),
+    batch_id VARCHAR(50),
+    earnings_code VARCHAR(20),
+    amount DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- End COMPLIANCE MODULE TABLES 

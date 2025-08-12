@@ -7,7 +7,8 @@ import {
   FileText, 
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ expanded, onToggle }) => {
     { path: '/timecard', icon: Clock, label: 'Timecard' },
     { path: '/scheduling', icon: Calendar, label: 'Scheduling' },
     { path: '/drivers', icon: Users, label: 'Drivers' },
+    { path: '/compliance', icon: ShieldCheck, label: 'COMPLIANCE' },
     { path: '/reports', icon: FileText, label: 'Reports' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];

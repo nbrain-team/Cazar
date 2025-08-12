@@ -123,3 +123,92 @@ export interface ScheduleOptimization {
     recommendation: string;
   }[];
 } 
+
+// COMPLIANCE TYPES
+export interface DriverIdentifiers {
+  id?: string;
+  driver_id?: string; // optional until backfilled
+  transporter_id: string;
+  station_code: string;
+  delivery_associate_name?: string;
+  adp_position_id?: string;
+}
+
+export interface DspDriverWeeklyMetric {
+  id?: string;
+  week_code: string; // e.g., 2025-29
+  station_code: string;
+  transporter_id: string;
+  delivered_packages?: number;
+  overall_standing?: string;
+  key_focus_area?: string;
+  on_road_safety_score?: string;
+  overall_quality_score?: string;
+  fico?: string;
+  acceleration?: string;
+  braking?: string;
+  cornering?: string;
+  distraction?: string;
+  seatbelt_off_rate?: number;
+  speeding?: string;
+  speeding_event_rate?: number;
+  distractions_rate?: number;
+  looking_at_phone?: string;
+  talking_on_phone?: string;
+  looking_down?: string;
+  following_distance_rate?: number;
+  sign_signal_violations_rate?: number;
+  stop_sign_violations?: number;
+  stop_light_violations?: number;
+  illegal_u_turns?: number;
+  cdf_dpmo?: number;
+  dcr?: number;
+  dsb?: number;
+  swc_pod?: number;
+  swc_cc?: number;
+  swc_ad?: number;
+  dnrs?: number;
+  shipments_per_on_zone_hour?: number;
+  pod_opps?: number;
+  cc_opps?: number;
+  customer_escalation_defect?: number;
+  customer_delivery_feedback?: number;
+}
+
+export interface SafetyEvent {
+  event_id?: string;
+  transporter_id: string;
+  station_code: string;
+  route_id?: string;
+  type: 'seatbelt' | 'speeding' | 'distraction' | 'hard_brake' | 'collision';
+  severity: 1 | 2 | 3 | 4 | 5;
+  occurred_at: string;
+  source?: string;
+  location?: { lat?: number; lng?: number } | Record<string, unknown>;
+  video_url?: string | null;
+}
+
+export interface ComplianceRule {
+  rule_id?: string;
+  metric_key: string;
+  operator: '>' | '>=' | '=' | '<' | '<=';
+  threshold_value: number;
+  window: 'daily' | 'weekly';
+  severity: 'low' | 'medium' | 'high';
+  active: boolean;
+  description?: string;
+}
+
+export interface Violation {
+  id?: string;
+  transporter_id: string;
+  station_code: string;
+  metric_key: string;
+  observed_value: number;
+  threshold_value: number;
+  severity: 'low' | 'medium' | 'high';
+  occurred_week?: string;
+  occurred_at?: string;
+  status: 'open' | 'acknowledged' | 'resolved' | 'escalated';
+  rule_id?: string;
+} 

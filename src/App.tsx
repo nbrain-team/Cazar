@@ -13,6 +13,7 @@ import SchedulingPage from './pages/SchedulingPage';
 import DriversPage from './pages/DriversPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import CompliancePage from './pages/CompliancePage';
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ function App() {
                       <Route path="/timecard" element={<TimecardPage />} />
                       <Route path="/scheduling" element={<SchedulingPage />} />
                       <Route path="/drivers" element={<DriversPage />} />
+                      <Route path="/compliance" element={<CompliancePage />} />
                       <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" />} />
