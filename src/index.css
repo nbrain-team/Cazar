@@ -268,3 +268,12 @@ body {
         width: 100%;
     }
 }
+
+/* Smart Chat Panel */
+.smart-chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 64px);
+    background: var(--card-bg);
+    transition: all 0.25s ease;
+}
