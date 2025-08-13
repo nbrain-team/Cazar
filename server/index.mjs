@@ -3,6 +3,8 @@ import cors from 'cors';
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import pg from 'pg';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 app.use(cors());
@@ -14,7 +16,7 @@ const pcIndexName = process.env.PINECONE_INDEX_NAME || 'nbrain';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-// RAG endpoint
+// API: RAG and actions (as before)
 app.post('/rag/query', async (req, res) => {
   try {
     const { query, topK = 8, station = 'ALL', week = '2025-29' } = req.body || {};
@@ -36,7 +38,6 @@ app.post('/rag/query', async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'rag_error', detail: String(err) }); }
 });
 
-// Violations lifecycle
 app.post('/api/violations/:id/ack', async (req, res) => {
   const { id } = req.params; const { user_id = 'system', transporter_id, metric_key } = req.body || {};
   try {
@@ -75,7 +76,6 @@ app.post('/api/violations/:id/escalate', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'escalate_failed' }); }
 });
 
-// WHC case notes
 app.post('/api/whc/:driver/:date/note', async (req, res) => {
   const { driver, date } = req.params; const { note='' } = req.body || {};
   try {
@@ -84,5 +84,14 @@ app.post('/api/whc/:driver/:date/note', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'note_failed' }); }
 });
 
-const port = process.env.PORT || 8080;
-app.listen(port, () => { console.log(`API listening on ${port}`); }); 
+// Static hosting for built frontend
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+const port = process.env.PORT || 10000;
+app.listen(port, () => { console.log(`Express server listening on ${port}`); }); 

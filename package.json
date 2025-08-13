@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "vite preview --port $PORT --host 0.0.0.0",
+    "prestart": "npm run build",
+    "start": "node server/index.mjs",
     "start:server": "node server/index.mjs"
   },
   "dependencies": {
