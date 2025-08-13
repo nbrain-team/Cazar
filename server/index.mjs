@@ -34,11 +34,84 @@ function downProject(vector, targetDim) {
   return out;
 }
 
+async function getTopSpeedingWithMetrics(limit = 5) {
+  const sql = `
+    WITH latest AS (
+      SELECT DISTINCT ON (station_code, transporter_id)
+        station_code, transporter_id, speeding_event_rate, dcr, swc_pod, created_at
+      FROM dsp_driver_weekly_metrics
+      ORDER BY station_code, transporter_id, created_at DESC
+    )
+    SELECT station_code, transporter_id, speeding_event_rate, dcr, swc_pod
+    FROM latest
+    WHERE speeding_event_rate IS NOT NULL
+    ORDER BY speeding_event_rate DESC NULLS LAST
+    LIMIT $1;
+  `;
+  const { rows } = await pool.query(sql, [limit]);
+  return rows || [];
+}
+
+async function getExecutiveStationSnapshot() {
+  const sql = `
+    WITH latest AS (
+      SELECT DISTINCT ON (station_code, transporter_id)
+        station_code, transporter_id, dcr, swc_pod, cdf_dpmo, created_at
+      FROM dsp_driver_weekly_metrics
+      ORDER BY station_code, transporter_id, created_at DESC
+    )
+    SELECT station_code,
+           COUNT(DISTINCT transporter_id) AS drivers,
+           AVG(dcr) AS avg_dcr,
+           AVG(swc_pod) AS avg_swc_pod,
+           AVG(cdf_dpmo) AS avg_cdf_dpmo
+    FROM latest
+    GROUP BY station_code
+    ORDER BY station_code;
+  `;
+  const { rows } = await pool.query(sql);
+  return rows || [];
+}
+
+function asMarkdownTable(headers, rows) {
+  const head = `| ${headers.join(' | ')} |\n| ${headers.map(() => '---').join(' | ')} |`;
+  const body = rows.map(r => `| ${r.join(' | ')} |`).join('\n');
+  return `${head}\n${body}`;
+}
+
 // API: RAG and actions (as before)
 app.post('/rag/query', async (req, res) => {
   try {
     const { query, topK = 8, station = 'ALL', week = '2025-29' } = req.body || {};
     if (!query) return res.status(400).json({ error: 'query required' });
+
+    const qLower = String(query).toLowerCase();
+    let dataContextBlocks = [];
+
+    // Lightweight intent detection for DB-backed analytics
+    if (qLower.includes('speeding') && (qLower.includes('top') || qLower.includes('highest') || qLower.includes('worst'))) {
+      const top = await getTopSpeedingWithMetrics(5);
+      if (top.length) {
+        const rows = top.map(r => [r.station_code, r.transporter_id, Number(r.speeding_event_rate).toFixed(3), Number(r.dcr).toFixed(3), Number(r.swc_pod).toFixed(3)]);
+        const md = [
+          '### Data: Top 5 by Speeding Event Rate (latest per driver)',
+          asMarkdownTable(['Station', 'Driver (Transporter ID)', 'Speeding rate', 'DCR', 'SWC-POD'], rows)
+        ].join('\n');
+        dataContextBlocks.push(md);
+      }
+    }
+    if (qLower.includes('executive') && qLower.includes('snapshot') && qLower.includes('station')) {
+      const snap = await getExecutiveStationSnapshot();
+      if (snap.length) {
+        const rows = snap.map(r => [r.station_code, String(r.drivers), Number(r.avg_dcr).toFixed(3), Number(r.avg_swc_pod).toFixed(3), Number(r.avg_cdf_dpmo).toFixed(3)]);
+        const md = [
+          '### Data: Executive Station Snapshot (latest per driver)',
+          asMarkdownTable(['Station', 'Drivers', 'Avg DCR', 'Avg SWC-POD', 'Avg CDF DPMO'], rows)
+        ].join('\n');
+        dataContextBlocks.push(md);
+      }
+    }
+
     // Use 768-compatible embeddings for current index; adapt if different
     const embed = await openai.embeddings.create({ model: 'text-embedding-ada-002', input: query });
     let vector = embed.data[0].embedding;
@@ -49,13 +122,15 @@ app.post('/rag/query', async (req, res) => {
     if (week) filter.week = week;
     const idx = pinecone.index(pcIndexName);
     const results = await idx.query({ vector, topK, includeMetadata: true, filter });
-    const contexts = (results.matches || []).map((m) => `Source:${m.id} Score:${m.score}\n${m.metadata?.text || ''}`).slice(0, topK);
+    const ragBlocks = (results.matches || []).map((m) => `Source:${m.id} Score:${m.score}\n${m.metadata?.text || ''}`).slice(0, topK);
+
+    const allContexts = [...dataContextBlocks, ...ragBlocks];
     const system = `You are a DSP ops analyst. Answer precisely using the provided context. If insufficient, say what is missing. Provide numeric summaries and call out WHC, CDF, DCR, SWC-POD, safety signals when relevant.`;
     const completion = await openai.chat.completions.create({
       model: 'gpt-4.1-mini', temperature: 0.2, max_tokens: 1200,
-      messages: [ { role: 'system', content: system }, { role: 'user', content: `Context:\n${contexts.join('\n\n')}\n\nQuestion: ${query}` } ]
+      messages: [ { role: 'system', content: system }, { role: 'user', content: `Context:\n${allContexts.join('\n\n')}\n\nQuestion: ${query}` } ]
     });
-    res.json({ answer: completion.choices?.[0]?.message?.content || '', contexts });
+    res.json({ answer: completion.choices?.[0]?.message?.content || '', contexts: allContexts });
   } catch (err) { console.error(err); res.status(500).json({ error: 'rag_error', detail: String(err) }); }
 });
 
