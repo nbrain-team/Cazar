@@ -1,56 +1,143 @@
 import { ComplianceService } from './complianceService';
 
+type MetricKey = 'cdf_dpmo' | 'dcr' | 'swc_pod' | 'swc_cc' | 'swc_ad' | 'dnrs' | 'delivered_packages' | 'seatbelt_off_rate' | 'speeding_event_rate' | 'distractions_rate';
+
+export interface SmartChatOptions {
+  station?: 'DYY5' | 'VNY1' | 'ALL';
+  week?: string; // e.g., 2025-29
+  explain?: boolean;
+  topN?: number;
+}
+
+const METRIC_SYNONYMS: Record<MetricKey, string[]> = {
+  cdf_dpmo: ['cdf', 'cdf dpmo', 'customer delivery feedback', 'defects per million', 'customer delivery feedback defects'],
+  dcr: ['dcr', 'delivery completion rate', 'completion rate'],
+  swc_pod: ['swc', 'swc-pod', 'pod compliance', 'photo on delivery'],
+  swc_cc: ['swc-cc', 'call customer'],
+  swc_ad: ['swc-ad', 'attempted delivery'],
+  dnrs: ['dnrs', 'non rescues', 'rescues', 'rescues avoided'],
+  delivered_packages: ['delivered', 'delivered packages', 'packages delivered'],
+  seatbelt_off_rate: ['seatbelt', 'seatbelt-off', 'seat belt'],
+  speeding_event_rate: ['speeding', 'speeding events'],
+  distractions_rate: ['distraction', 'distractions'],
+};
+
+function findMetricKeys(q: string): MetricKey[] {
+  const hit: MetricKey[] = [];
+  Object.entries(METRIC_SYNONYMS).forEach(([k, arr]) => {
+    if (arr.some(s => q.includes(s))) hit.push(k as MetricKey);
+  });
+  // defaults
+  if (hit.length === 0 && (q.includes('band') || q.includes('scorecard'))) hit.push('dcr', 'swc_pod');
+  return hit.length ? hit : ['dcr'];
+}
+
+function parseOps(q: string) {
+  const ops = {
+    compare: q.includes(' vs ') || q.includes(' versus '),
+    avg: q.includes('avg') || q.includes('average') || q.includes('mean'),
+    sum: q.includes('sum') || q.includes('total'),
+    top: /top\s(\d{1,2})/.exec(q)?.[1],
+    worst: /bottom\s(\d{1,2})|worst\s(\d{1,2})/.exec(q)?.[1],
+    trend: q.includes('trend') || q.includes('over time')
+  };
+  return ops;
+}
+
+function parseStations(q: string, override?: SmartChatOptions['station']): ('DYY5'|'VNY1')[] {
+  if (override && override !== 'ALL') return [override];
+  const got: ('DYY5'|'VNY1')[] = [];
+  if (q.includes('dyy5')) got.push('DYY5');
+  if (q.includes('vny1')) got.push('VNY1');
+  return got.length ? got : ['DYY5', 'VNY1'];
+}
+
+function topN<T>(arr: T[], n: number, by: (t: T) => number, asc = false): T[] {
+  const s = [...arr].sort((a, b) => (asc ? 1 : -1) * (by(a) - by(b)));
+  return s.slice(0, n);
+}
+
+function avg(arr: number[]): number { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function sum(arr: number[]): number { return arr.reduce((a,b)=>a+b,0); }
+
 export class SmartChatService {
-  static async ask(query: string): Promise<string> {
+  static async ask(query: string, opts?: SmartChatOptions): Promise<string> {
     const q = query.toLowerCase();
+    const week = opts?.week ?? '2025-29';
+    const stations = parseStations(q, opts?.station);
+    const metrics = findMetricKeys(q);
+    const ops = parseOps(q);
 
-    // Simple intent routing for demo
-    if (q.includes('weekly ot') || q.includes('overtime')) {
-      const dyy5 = await ComplianceService.getWeeklyMetrics({ station_code: 'DYY5', week_code: '2025-29' });
-      const vny1 = await ComplianceService.getWeeklyMetrics({ station_code: 'VNY1', week_code: '2025-29' });
-      const dyy5Drivers = dyy5.length;
-      const vny1Drivers = vny1.length;
-      return `Weekly OT risk proxy: DYY5 has ${dyy5Drivers} active drivers with avg SWC-POD ${(avg(dyy5.map(m=>m.swc_pod||0))).toFixed(3)} and CDF DPMO ${(avg(dyy5.map(m=>m.cdf_dpmo||0))).toFixed(1)}. VNY1 has ${vny1Drivers} drivers with avg SWC-POD ${(avg(vny1.map(m=>m.swc_pod||0))).toFixed(3)} and CDF DPMO ${(avg(vny1.map(m=>m.cdf_dpmo||0))).toFixed(1)}. Use Schedule Builder to minimize OT by pairing lower SPH cohorts earlier.`;
+    // Load weekly metrics for requested stations
+    const all = await Promise.all(stations.map(s => ComplianceService.getWeeklyMetrics({ station_code: s, week_code: week })));
+    const byStation = new Map(stations.map((s, i) => [s, all[i]]));
+
+    // Prepare response parts
+    const lines: string[] = [];
+
+    // Compare mode
+    if (ops.compare && stations.length >= 2 && metrics.length >= 1) {
+      const a = stations[0];
+      const b = stations[1];
+      metrics.forEach(m => {
+        const va = avg((byStation.get(a) || []).map(x => (x as any)[m] || 0));
+        const vb = avg((byStation.get(b) || []).map(x => (x as any)[m] || 0));
+        lines.push(`${m} — ${a}: ${fmt(va, m)} vs ${b}: ${fmt(vb, m)} (${diffPct(va, vb)})`);
+      });
+      return finalize(lines, opts);
     }
 
-    if (q.includes('5th') || q.includes('6th')) {
-      const dyy5 = await ComplianceService.getWeeklyMetrics({ station_code: 'DYY5', week_code: '2025-29' });
-      const dnrs = sum(dyy5.map(m => m.dnrs || 0));
-      return `5th/6th-day exposure indicator (DNRS as proxy) at DYY5 is ${dnrs}. Recommend enforcing rest windows and using Live Rescue to avoid overextension on weekends.`;
+    // Top / Bottom ranking
+    const topNumber = Number(ops.top || ops.worst || opts?.topN || 0);
+    if (topNumber > 0 && metrics.length >= 1) {
+      const m = metrics[0];
+      const rows = stations.flatMap(s => (byStation.get(s) || []).map(r => ({ ...r, station: s })));
+      const ranked = topN(rows, topNumber, r => (r as any)[m] || 0, Boolean(ops.worst));
+      ranked.forEach((r, i) => {
+        lines.push(`#${i+1} ${r.station} ${r.transporter_id}: ${m} ${fmt((r as any)[m]||0, m)}; DCR ${fmt(r.dcr||0,'dcr')}; SWC-POD ${fmt(r.swc_pod||0,'swc_pod')}`);
+      });
+      return finalize(lines, opts);
     }
 
-    if (q.includes('cdf') || q.includes('dcr') || q.includes('swc')) {
-      const station = q.includes('vny1') ? 'VNY1' : 'DYY5';
-      const metrics = await ComplianceService.getWeeklyMetrics({ station_code: station, week_code: '2025-29' });
-      const avgCdf = avg(metrics.map(m => m.cdf_dpmo || 0));
-      const avgDcr = avg(metrics.map(m => m.dcr || 0));
-      const avgSwc = avg(metrics.map(m => m.swc_pod || 0));
-      return `${station} averages — CDF DPMO: ${avgCdf.toFixed(1)}, DCR: ${avgDcr.toFixed(3)}, SWC-POD: ${avgSwc.toFixed(3)}. Focus on buildings with repeat defects and enforce POD prompts.`;
+    // Aggregate (avg/sum)
+    if (ops.avg || ops.sum || metrics.length) {
+      metrics.forEach(m => {
+        stations.forEach(s => {
+          const rows = byStation.get(s) || [];
+          const values = rows.map(x => (x as any)[m] || 0);
+          const v = ops.sum ? sum(values) : avg(values);
+          lines.push(`${s} ${ops.sum ? 'total' : 'avg'} ${m}: ${fmt(v, m)}`);
+        });
+      });
+      return finalize(lines, opts);
     }
 
-    if (q.includes('seatbelt') || q.includes('speed') || q.includes('distraction')) {
-      const station = q.includes('vny1') ? 'VNY1' : 'DYY5';
-      const metrics = await ComplianceService.getWeeklyMetrics({ station_code: station, week_code: '2025-29' });
-      const sb = avg(metrics.map(m => m.seatbelt_off_rate || 0));
-      const sp = avg(metrics.map(m => m.speeding_event_rate || 0));
-      const di = avg(metrics.map(m => m.distractions_rate || 0));
-      return `${station} safety signals — Seatbelt-off rate: ${(sb).toFixed(3)}, Speeding event rate: ${(sp).toFixed(3)}, Distractions rate: ${(di).toFixed(3)}. Recommend targeted coaching for the small cohort above zero.`;
-    }
-
-    // Fallback: combined summary
-    const [dyy5, vny1] = await Promise.all([
-      ComplianceService.getWeeklyMetrics({ station_code: 'DYY5', week_code: '2025-29' }),
-      ComplianceService.getWeeklyMetrics({ station_code: 'VNY1', week_code: '2025-29' }),
-    ]);
-    return `Summary — DYY5: drivers ${dyy5.length}, avg SWC-POD ${(avg(dyy5.map(m=>m.swc_pod||0))).toFixed(3)}, CDF DPMO ${(avg(dyy5.map(m=>m.cdf_dpmo||0))).toFixed(1)}. VNY1: drivers ${vny1.length}, avg SWC-POD ${(avg(vny1.map(m=>m.swc_pod||0))).toFixed(3)}, CDF DPMO ${(avg(vny1.map(m=>m.cdf_dpmo||0))).toFixed(1)}. Ask me about weekly OT, 5th/6th-day exposure, CDF/DCR/SWC, or safety events.`;
+    // Fallback summary
+    stations.forEach(s => {
+      const rows = byStation.get(s) || [];
+      lines.push(`${s}: drivers ${rows.length}, avg DCR ${fmt(avg(rows.map(r=>r.dcr||0)),'dcr')}, avg SWC-POD ${fmt(avg(rows.map(r=>r.swc_pod||0)),'swc_pod')}, avg CDF DPMO ${fmt(avg(rows.map(r=>r.cdf_dpmo||0)),'cdf_dpmo')}`);
+    });
+    return finalize(lines, opts);
   }
 }
 
-function avg(arr: number[]): number {
-  if (!arr.length) return 0;
-  return arr.reduce((a, b) => a + b, 0) / arr.length;
+function fmt(v: number, key: string) {
+  if (['dcr','swc_pod','swc_cc','swc_ad'].includes(key)) return (v).toFixed(3);
+  if (['seatbelt_off_rate','speeding_event_rate','distractions_rate'].includes(key)) return (v).toFixed(3);
+  if (['cdf_dpmo','delivered_packages','dnrs'].includes(key)) return Number(v.toFixed(3)).toString();
+  return Number(v.toFixed(2)).toString();
 }
 
-function sum(arr: number[]): number {
-  return arr.reduce((a, b) => a + b, 0);
+function diffPct(a: number, b: number) {
+  if (b === 0) return '+∞%';
+  const d = ((a - b) / Math.abs(b)) * 100;
+  const sign = d >= 0 ? '+' : '';
+  return `${sign}${d.toFixed(1)}%`;
+}
+
+function finalize(lines: string[], opts?: SmartChatOptions) {
+  if (opts?.explain) {
+    return lines.concat(['—', 'Computed over weekly DSP metrics (mock), filtered by station/week context.']).join('\n');
+  }
+  return lines.join('\n');
 } 
