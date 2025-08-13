@@ -10,8 +10,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY, environment: process.env.PINECONE_ENVIRONMENT });
+const openai = new OpenAI({ apiKey: process.envOPENAI_API_KEY || process.env.OPENAI_API_KEY });
+// Pinecone v3: no environment property; index is resolved by name
+const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 const pcIndexName = process.env.PINECONE_INDEX_NAME || 'nbrain';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
@@ -26,7 +27,7 @@ app.post('/rag/query', async (req, res) => {
     const filter = {};
     if (station && station !== 'ALL') filter.station = station;
     if (week) filter.week = week;
-    const idx = pinecone.Index(pcIndexName);
+    const idx = pinecone.index(pcIndexName);
     const results = await idx.query({ vector, topK, includeMetadata: true, filter });
     const contexts = (results.matches || []).map((m) => `Source:${m.id} Score:${m.score}\n${m.metadata?.text || ''}`).slice(0, topK);
     const system = `You are a DSP ops analyst. Answer precisely using the provided context. If insufficient, say what is missing. Provide numeric summaries and call out WHC, CDF, DCR, SWC-POD, safety signals when relevant.`;
