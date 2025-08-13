@@ -173,7 +173,7 @@ CREATE TRIGGER update_discrepancies_updated_at BEFORE UPDATE ON timecard_discrep
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- COMPLIANCE MODULE TABLES
 
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS compliance_rules (
     metric_key VARCHAR(100) NOT NULL, -- e.g., seatbelt_off_rate, speeding_event_rate
     operator VARCHAR(5) CHECK (operator IN ('>','>=','=','<','<=')) NOT NULL,
     threshold_value DECIMAL(12,4) NOT NULL,
-    window VARCHAR(20) CHECK (window IN ('daily','weekly')) NOT NULL,
+    rule_window VARCHAR(20) CHECK (rule_window IN ('daily','weekly')) NOT NULL,
     severity VARCHAR(10) CHECK (severity IN ('low','medium','high')) NOT NULL,
     active BOOLEAN DEFAULT TRUE,
     description TEXT,
