@@ -10,20 +10,40 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-const openai = new OpenAI({ apiKey: process.envOPENAI_API_KEY || process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // Pinecone v3: no environment property; index is resolved by name
 const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 const pcIndexName = process.env.PINECONE_INDEX_NAME || 'nbrain';
+const pcTargetDim = Number(process.env.PINECONE_DIM || 768);
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+function downProject(vector, targetDim) {
+  const n = vector.length;
+  if (n === targetDim) return vector;
+  const out = new Array(targetDim).fill(0);
+  const factor = n / targetDim; // e.g., 1536/768=2, 3072/768=4
+  for (let i = 0; i < targetDim; i++) {
+    const start = Math.floor(i * factor);
+    const end = Math.floor((i + 1) * factor);
+    let sum = 0;
+    let count = 0;
+    for (let j = start; j < Math.min(end, n); j++) { sum += vector[j]; count++; }
+    out[i] = count ? sum / count : 0;
+  }
+  return out;
+}
 
 // API: RAG and actions (as before)
 app.post('/rag/query', async (req, res) => {
   try {
     const { query, topK = 8, station = 'ALL', week = '2025-29' } = req.body || {};
     if (!query) return res.status(400).json({ error: 'query required' });
-    const embed = await openai.embeddings.create({ model: 'text-embedding-3-large', input: query });
-    const vector = embed.data[0].embedding;
+    // Use 768-compatible embeddings for current index; adapt if different
+    const embed = await openai.embeddings.create({ model: 'text-embedding-ada-002', input: query });
+    let vector = embed.data[0].embedding;
+    if (vector.length !== pcTargetDim) vector = downProject(vector, pcTargetDim);
+
     const filter = {};
     if (station && station !== 'ALL') filter.station = station;
     if (week) filter.week = week;
