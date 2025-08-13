@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Send } from 'lucide-react';
 import { SmartChatService } from '../services/smartChatService';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface SmartChatPanelProps {
   open: boolean;
@@ -14,7 +16,7 @@ interface ChatMessage {
 
 export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', text: 'Hi! Ask me about WHC, 5th/6th-day exposure, weekly OT, CDF DPMO, DCR, SWC-POD, or combine them across DYY5/VNY1.' }
+    { role: 'assistant', text: 'Hi! I can crunch operations metrics and do deep RAG research. Try: "Compare DCR vs SWC‑POD for DYY5 vs VNY1" or "Deep research: top 5 speeding event rate and where to improve".' }
   ]);
   const [input, setInput] = useState('');
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -31,8 +33,13 @@ export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
     const userMsg: ChatMessage = { role: 'user', text: trimmed };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    const answer = await SmartChatService.ask(trimmed);
-    setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
+    const answer = await SmartChatService.ask(trimmed, { explain: false });
+    setMessages(prev => [...prev, { role: 'assistant', text: formatFriendly(answer) }]);
+  };
+
+  const formatFriendly = (text: string) => {
+    // Light-touch formatting: ensure line breaks and bullets render nicely
+    return text.replaceAll(' - ', '\n- ');
   };
 
   return (
@@ -54,7 +61,11 @@ export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
         {messages.map((m, idx) => (
           <div key={idx} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
             <div className="card" style={{ background: m.role === 'user' ? 'var(--primary-light)' : 'var(--card-bg)', padding: '0.75rem 1rem' }}>
-              <div style={{ fontSize: '0.9rem' }}>{m.text}</div>
+              {m.role === 'assistant' ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+              ) : (
+                <div style={{ fontSize: '0.9rem' }}>{m.text}</div>
+              )}
             </div>
           </div>
         ))}
@@ -62,7 +73,7 @@ export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
       <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', borderTop: '1px solid var(--border)' }}>
         <input
           className="input"
-          placeholder="Ask about weekly OT risk for DYY5 vs VNY1, or 5th/6th-day exposure..."
+          placeholder="Ask for a comparison, ranking, or type ‘deep research: ...’ for RAG"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') send(); }}
