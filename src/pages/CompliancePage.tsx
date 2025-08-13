@@ -46,12 +46,19 @@ export default function CompliancePage() {
   const [whcAudit, setWhcAudit] = useState<WorkHoursAuditDaily[]>([]);
   const [editingRuleKey, setEditingRuleKey] = useState<string | null>(null);
   const [thresholdDraft, setThresholdDraft] = useState<string>('');
+  const [whcNotes, setWhcNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     ComplianceService.getWeeklyMetrics({ station_code: station, week_code: week }).then(setMetrics);
     ComplianceService.getViolations({ station_code: station }).then(setViolations);
     ComplianceService.getRules().then(setRules);
-    WhcService.computeDailyAudit(station, auditDate).then(setWhcAudit);
+    WhcService.computeDailyAudit(station, auditDate).then(rows => {
+      setWhcAudit(rows);
+      // initialize notes map keys
+      const m: Record<string, string> = {};
+      rows.forEach(r => { m[`${r.driver_name}-${r.work_date}`] = whcNotes[`${r.driver_name}-${r.work_date}`] || ''; });
+      setWhcNotes(m);
+    });
   }, [station, week, auditDate]);
 
   const kpis = useMemo(() => {
@@ -100,10 +107,15 @@ export default function CompliancePage() {
     setEditingRuleKey(null);
   };
 
+  const exportWhcWithNotes = () => {
+    const rows = whcAudit.map(r => ({ ...r, notes: whcNotes[`${r.driver_name}-${r.work_date}`] || '' }));
+    downloadCsv(`${station}-${auditDate}-payroll-guard.csv`, rows as unknown as Record<string, unknown>[]);
+  };
+
   return (
     <div style={{ padding: '2rem' }}>
       <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>COMPLIANCE</h1>
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <select value={station} onChange={e => setStation(e.target.value)}>
           <option value="DYY5">DYY5</option>
           <option value="VNY1">VNY1</option>
@@ -114,13 +126,13 @@ export default function CompliancePage() {
       </div>
 
       <Tabs.Root defaultValue="overview">
-        <Tabs.List>
-          <Tabs.Trigger value="overview">OVERVIEW</Tabs.Trigger>
-          <Tabs.Trigger value="drivers">DRIVERS</Tabs.Trigger>
-          <Tabs.Trigger value="violations">VIOLATIONS</Tabs.Trigger>
-          <Tabs.Trigger value="rules">RULES</Tabs.Trigger>
-          <Tabs.Trigger value="scorecards">SCORECARDS</Tabs.Trigger>
-          <Tabs.Trigger value="whc">WORK HOURS</Tabs.Trigger>
+        <Tabs.List style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+          <Tabs.Trigger value="overview" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>OVERVIEW</Tabs.Trigger>
+          <Tabs.Trigger value="drivers" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>DRIVERS</Tabs.Trigger>
+          <Tabs.Trigger value="violations" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>VIOLATIONS</Tabs.Trigger>
+          <Tabs.Trigger value="rules" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>RULES</Tabs.Trigger>
+          <Tabs.Trigger value="scorecards" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>SCORECARDS</Tabs.Trigger>
+          <Tabs.Trigger value="whc" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>WORK HOURS</Tabs.Trigger>
         </Tabs.List>
 
         <Tabs.Content value="overview">
@@ -149,127 +161,133 @@ export default function CompliancePage() {
 
         <Tabs.Content value="drivers">
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '1rem', flexWrap: 'wrap' }}>
               <h3 style={{ margin: 0 }}>Drivers</h3>
               <button className="btn btn-secondary" onClick={() => downloadCsv(`${station}-${week}-drivers.csv`, metrics as unknown as Record<string, unknown>[])}>Export CSV</button>
             </div>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>TRANSPORTER ID</th>
-                  <th>DELIVERED</th>
-                  <th>CDF DPMO</th>
-                  <th>SEATBELT-OFF RATE</th>
-                  <th>SPEEDING EVENT RATE</th>
-                  <th>DISTRACTIONS RATE</th>
-                  <th>DCR</th>
-                  <th>DSB</th>
-                  <th>SWC-POD</th>
-                  <th>DNRS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map(m => (
-                  <tr key={`${m.transporter_id}-${m.week_code}`}>
-                    <td>{m.transporter_id}</td>
-                    <td>{m.delivered_packages}</td>
-                    <td>{m.cdf_dpmo ?? 0}</td>
-                    <td>{(m.seatbelt_off_rate ?? 0).toFixed(3)}</td>
-                    <td>{(m.speeding_event_rate ?? 0).toFixed(3)}</td>
-                    <td>{(m.distractions_rate ?? 0).toFixed(3)}</td>
-                    <td>{m.dcr ?? 0}</td>
-                    <td>{m.dsb ?? 0}</td>
-                    <td>{m.swc_pod ?? 0}</td>
-                    <td>{m.dnrs ?? 0}</td>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>TRANSPORTER ID</th>
+                    <th>DELIVERED</th>
+                    <th>CDF DPMO</th>
+                    <th>SEATBELT-OFF RATE</th>
+                    <th>SPEEDING EVENT RATE</th>
+                    <th>DISTRACTIONS RATE</th>
+                    <th>DCR</th>
+                    <th>DSB</th>
+                    <th>SWC-POD</th>
+                    <th>DNRS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {metrics.map(m => (
+                    <tr key={`${m.transporter_id}-${m.week_code}`}>
+                      <td>{m.transporter_id}</td>
+                      <td>{m.delivered_packages}</td>
+                      <td>{m.cdf_dpmo ?? 0}</td>
+                      <td>{(m.seatbelt_off_rate ?? 0).toFixed(3)}</td>
+                      <td>{(m.speeding_event_rate ?? 0).toFixed(3)}</td>
+                      <td>{(m.distractions_rate ?? 0).toFixed(3)}</td>
+                      <td>{m.dcr ?? 0}</td>
+                      <td>{m.dsb ?? 0}</td>
+                      <td>{m.swc_pod ?? 0}</td>
+                      <td>{m.dnrs ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Tabs.Content>
 
         <Tabs.Content value="violations">
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '1rem', flexWrap: 'wrap' }}>
               <h3 style={{ margin: 0 }}>Violations</h3>
               <button className="btn btn-secondary" onClick={() => downloadCsv(`${station}-${week}-violations.csv`, violations as unknown as Record<string, unknown>[])}>Export CSV</button>
             </div>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>TRANSPORTER ID</th>
-                  <th>METRIC</th>
-                  <th>OBSERVED</th>
-                  <th>THRESHOLD</th>
-                  <th>SEVERITY</th>
-                  <th>STATUS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {violations.map(v => (
-                  <tr key={`${v.transporter_id}-${v.metric_key}`}>
-                    <td>{v.transporter_id}</td>
-                    <td>{v.metric_key}</td>
-                    <td>{v.observed_value}</td>
-                    <td>{v.threshold_value}</td>
-                    <td>{v.severity}</td>
-                    <td>{v.status}</td>
-                    <td style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-secondary" onClick={() => acknowledge(v)}>Ack</button>
-                      <button className="btn btn-primary" onClick={() => resolve(v)}>Resolve</button>
-                    </td>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>TRANSPORTER ID</th>
+                    <th>METRIC</th>
+                    <th>OBSERVED</th>
+                    <th>THRESHOLD</th>
+                    <th>SEVERITY</th>
+                    <th>STATUS</th>
+                    <th>ACTIONS</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {violations.map(v => (
+                    <tr key={`${v.transporter_id}-${v.metric_key}`}>
+                      <td>{v.transporter_id}</td>
+                      <td>{v.metric_key}</td>
+                      <td>{v.observed_value}</td>
+                      <td>{v.threshold_value}</td>
+                      <td>{v.severity}</td>
+                      <td>{v.status}</td>
+                      <td style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className="btn btn-secondary" onClick={() => acknowledge(v)}>Ack</button>
+                        <button className="btn btn-primary" onClick={() => resolve(v)}>Resolve</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Tabs.Content>
 
         <Tabs.Content value="rules">
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>METRIC</th>
-                  <th>OPERATOR</th>
-                  <th>THRESHOLD</th>
-                  <th>WINDOW</th>
-                  <th>SEVERITY</th>
-                  <th>ACTIVE</th>
-                  <th>ACTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map(r => {
-                  const key = `${r.metric_key}-${r.window}`;
-                  const isEditing = editingRuleKey === key;
-                  return (
-                    <tr key={key}>
-                      <td>{r.metric_key}</td>
-                      <td>{r.operator}</td>
-                      <td>
-                        {isEditing ? (
-                          <input className="input" value={thresholdDraft} onChange={e => setThresholdDraft(e.target.value)} style={{ maxWidth: 120 }} />
-                        ) : (
-                          r.threshold_value
-                        )}
-                      </td>
-                      <td>{r.window}</td>
-                      <td>{r.severity}</td>
-                      <td>{r.active ? 'Yes' : 'No'}</td>
-                      <td style={{ display: 'flex', gap: '0.5rem' }}>
-                        {isEditing ? (
-                          <button className="btn btn-primary" onClick={() => saveRule(r)}>Save</button>
-                        ) : (
-                          <button className="btn btn-secondary" onClick={() => startEditRule(r)}>Edit</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>METRIC</th>
+                    <th>OPERATOR</th>
+                    <th>THRESHOLD</th>
+                    <th>WINDOW</th>
+                    <th>SEVERITY</th>
+                    <th>ACTIVE</th>
+                    <th>ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rules.map(r => {
+                    const key = `${r.metric_key}-${r.window}`;
+                    const isEditing = editingRuleKey === key;
+                    return (
+                      <tr key={key}>
+                        <td>{r.metric_key}</td>
+                        <td>{r.operator}</td>
+                        <td>
+                          {isEditing ? (
+                            <input className="input" value={thresholdDraft} onChange={e => setThresholdDraft(e.target.value)} style={{ maxWidth: 120 }} />
+                          ) : (
+                            r.threshold_value
+                          )}
+                        </td>
+                        <td>{r.window}</td>
+                        <td>{r.severity}</td>
+                        <td>{r.active ? 'Yes' : 'No'}</td>
+                        <td style={{ display: 'flex', gap: '0.5rem' }}>
+                          {isEditing ? (
+                            <button className="btn btn-primary" onClick={() => saveRule(r)}>Save</button>
+                          ) : (
+                            <button className="btn btn-secondary" onClick={() => startEditRule(r)}>Edit</button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Tabs.Content>
 
@@ -286,45 +304,60 @@ export default function CompliancePage() {
         </Tabs.Content>
 
         <Tabs.Content value="whc">
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <label>Date: <input className="input" type="date" value={auditDate} onChange={e => setAuditDate(e.target.value)} /></label>
-            <button className="btn btn-secondary" onClick={() => downloadCsv(`${station}-${auditDate}-payroll-guard.csv`, whcAudit as unknown as Record<string, unknown>[])}>Export Payroll Guard CSV</button>
+            <button className="btn btn-secondary" onClick={exportWhcWithNotes}>Export Payroll Guard CSV</button>
           </div>
           <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>DRIVER</th>
-                  <th>SHIFT START</th>
-                  <th>SHIFT END</th>
-                  <th>ON-DUTY HOURS</th>
-                  <th>MEAL (MIN)</th>
-                  <th>MEAL IN WINDOW</th>
-                  <th>DAILY MAX?</th>
-                  <th>5TH/6TH DAY?</th>
-                  <th>WEEKLY HOURS</th>
-                  <th>WEEKLY OT?</th>
-                  <th>VERDICT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {whcAudit.map(a => (
-                  <tr key={`${a.driver_name}-${a.work_date}`}>
-                    <td>{a.driver_name}</td>
-                    <td>{a.shift_start ? new Date(a.shift_start).toLocaleTimeString() : ''}</td>
-                    <td>{a.shift_end ? new Date(a.shift_end).toLocaleTimeString() : ''}</td>
-                    <td>{a.on_duty_hours?.toFixed(2)}</td>
-                    <td>{a.meal_minutes}</td>
-                    <td>{a.meal_within_window ? 'Yes' : 'No'}</td>
-                    <td>{a.daily_max_exceeded ? 'Yes' : 'No'}</td>
-                    <td>{a.fifth_sixth_day_flag ? 'Yes' : 'No'}</td>
-                    <td>{a.weekly_hours?.toFixed(2)}</td>
-                    <td>{a.weekly_ot_flag ? 'Yes' : 'No'}</td>
-                    <td>{a.verdict}</td>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>DRIVER</th>
+                    <th>SHIFT START</th>
+                    <th>SHIFT END</th>
+                    <th>ON-DUTY HOURS</th>
+                    <th>MEAL (MIN)</th>
+                    <th>MEAL IN WINDOW</th>
+                    <th>DAILY MAX?</th>
+                    <th>5TH/6TH DAY?</th>
+                    <th>WEEKLY HOURS</th>
+                    <th>WEEKLY OT?</th>
+                    <th>VERDICT</th>
+                    <th>NOTES</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {whcAudit.map(a => {
+                    const key = `${a.driver_name}-${a.work_date}`;
+                    return (
+                      <tr key={key}>
+                        <td>{a.driver_name}</td>
+                        <td>{a.shift_start ? new Date(a.shift_start).toLocaleTimeString() : ''}</td>
+                        <td>{a.shift_end ? new Date(a.shift_end).toLocaleTimeString() : ''}</td>
+                        <td>{a.on_duty_hours?.toFixed(2)}</td>
+                        <td>{a.meal_minutes}</td>
+                        <td>{a.meal_within_window ? 'Yes' : 'No'}</td>
+                        <td>{a.daily_max_exceeded ? 'Yes' : 'No'}</td>
+                        <td>{a.fifth_sixth_day_flag ? 'Yes' : 'No'}</td>
+                        <td>{a.weekly_hours?.toFixed(2)}</td>
+                        <td>{a.weekly_ot_flag ? 'Yes' : 'No'}</td>
+                        <td>{a.verdict}</td>
+                        <td>
+                          <input
+                            className="input"
+                            style={{ maxWidth: 240 }}
+                            placeholder="Add note for payroll/CAP"
+                            value={whcNotes[key] || ''}
+                            onChange={(e) => setWhcNotes(prev => ({ ...prev, [key]: e.target.value }))}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Tabs.Content>
       </Tabs.Root>
