@@ -63,6 +63,22 @@ function sum(arr: number[]): number { return arr.reduce((a,b)=>a+b,0); }
 export class SmartChatService {
   static async ask(query: string, opts?: SmartChatOptions): Promise<string> {
     const q = query.toLowerCase();
+
+    // If user asks for deep research, route to RAG server
+    if (q.includes('deep') || q.includes('research') || q.includes('rag') || q.includes('vector')) {
+      try {
+        const resp = await fetch('/rag/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, topK: opts?.topN ?? 8, station: opts?.station ?? 'ALL', week: opts?.week ?? '2025-29' })
+        });
+        const data = await resp.json();
+        if (data?.answer) return data.answer;
+      } catch (e) {
+        console.warn('RAG call failed, falling back to local analytics', e);
+      }
+    }
+
     const week = opts?.week ?? '2025-29';
     const stations = parseStations(q, opts?.station);
     const metrics = findMetricKeys(q);
