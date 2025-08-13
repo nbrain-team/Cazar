@@ -82,15 +82,15 @@ export default function CompliancePage() {
   }, [metrics]);
 
   const acknowledge = async (v: Violation) => {
-    await ComplianceService.acknowledgeViolation(v.id || `${v.transporter_id}-${v.metric_key}`);
+    await ComplianceService.acknowledgeViolation({ transporter_id: v.transporter_id, metric_key: v.metric_key });
     const updated = await ComplianceService.getViolations({ station_code: station });
-    setViolations(updated);
+    setViolations(updated.map(x => x.transporter_id === v.transporter_id && x.metric_key === v.metric_key ? { ...x, status: 'acknowledged' } : x));
   };
 
   const resolve = async (v: Violation) => {
-    await ComplianceService.resolveViolation(v.id || `${v.transporter_id}-${v.metric_key}`);
+    await ComplianceService.resolveViolation({ transporter_id: v.transporter_id, metric_key: v.metric_key, reason_code: 'demo' });
     const updated = await ComplianceService.getViolations({ station_code: station });
-    setViolations(updated);
+    setViolations(updated.map(x => x.transporter_id === v.transporter_id && x.metric_key === v.metric_key ? { ...x, status: 'resolved' } : x));
   };
 
   const startEditRule = (r: ComplianceRule) => {

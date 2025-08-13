@@ -16,9 +16,9 @@ const weeklyMetrics: DspDriverWeeklyMetric[] = [
     week_code: '2025-29', station_code: 'VNY1', transporter_id: 'A1UPD0VQ5XF9L',
     delivered_packages: 433, overall_standing: 'Fantastic', key_focus_area: 'Photo-On-Delivery',
     on_road_safety_score: 'Coming Soon', overall_quality_score: 'Fantastic',
-    seatbelt_off_rate: 0, speeding_event_rate: 0.002, distractions_rate: 0.001,
+    seatbelt_off_rate: 0.003, speeding_event_rate: 0.008, distractions_rate: 0.004,
     sign_signal_violations_rate: 0, stop_sign_violations: 0, stop_light_violations: 0, illegal_u_turns: 0,
-    cdf_dpmo: 0, dcr: 1.0, dsb: 0.0, swc_pod: 0.998, swc_cc: 0.0, swc_ad: 0.0,
+    cdf_dpmo: 320, dcr: 0.996, dsb: 0.002, swc_pod: 0.998, swc_cc: 0.003, swc_ad: 0.004,
     dnrs: 2, shipments_per_on_zone_hour: 28.559, pod_opps: 791, cc_opps: 0, customer_escalation_defect: 0,
     customer_delivery_feedback: 0,
   },
@@ -26,9 +26,9 @@ const weeklyMetrics: DspDriverWeeklyMetric[] = [
     week_code: '2025-29', station_code: 'VNY1', transporter_id: 'A392ICYQEKZ789',
     delivered_packages: 52, overall_standing: 'Fantastic', key_focus_area: 'Photo-On-Delivery',
     on_road_safety_score: 'Coming Soon', overall_quality_score: 'Fantastic',
-    seatbelt_off_rate: 0, speeding_event_rate: 0.0, distractions_rate: 0.0,
+    seatbelt_off_rate: 0.001, speeding_event_rate: 0.002, distractions_rate: 0.000,
     sign_signal_violations_rate: 0, stop_sign_violations: 0, stop_light_violations: 0, illegal_u_turns: 0,
-    cdf_dpmo: 0, dcr: 1.0, dsb: 0.0, swc_pod: 0.912, swc_cc: 0.0, swc_ad: 0.0,
+    cdf_dpmo: 180, dcr: 0.993, dsb: 0.001, swc_pod: 0.912, swc_cc: 0.001, swc_ad: 0.001,
     dnrs: 0, shipments_per_on_zone_hour: 22, pod_opps: 34, cc_opps: 0, customer_escalation_defect: 0,
     customer_delivery_feedback: 0,
   },
@@ -36,9 +36,9 @@ const weeklyMetrics: DspDriverWeeklyMetric[] = [
     week_code: '2025-29', station_code: 'DYY5', transporter_id: 'A1TYMBVD1U5VKQ',
     delivered_packages: 2688, overall_standing: 'Fantastic', key_focus_area: 'Customer Delivery Feedback',
     on_road_safety_score: 'Fantastic', overall_quality_score: 'Fantastic',
-    seatbelt_off_rate: 0, speeding_event_rate: 0.0, distractions_rate: 0.0,
+    seatbelt_off_rate: 0.002, speeding_event_rate: 0.004, distractions_rate: 0.006,
     sign_signal_violations_rate: 0, stop_sign_violations: 0, stop_light_violations: 0, illegal_u_turns: 0,
-    cdf_dpmo: 1868.0, dcr: 0.999, dsb: 0.0, swc_pod: 1.0, swc_cc: 0.0, swc_ad: 0.0,
+    cdf_dpmo: 980, dcr: 0.999, dsb: 0.003, swc_pod: 0.997, swc_cc: 0.002, swc_ad: 0.003,
     dnrs: 1, shipments_per_on_zone_hour: 28.559, pod_opps: 791, cc_opps: 0, customer_escalation_defect: 0,
     customer_delivery_feedback: 1868.0,
   },
@@ -46,9 +46,9 @@ const weeklyMetrics: DspDriverWeeklyMetric[] = [
     week_code: '2025-29', station_code: 'DYY5', transporter_id: 'A1CO02I4VOCA74',
     delivered_packages: 647, overall_standing: 'Fantastic', key_focus_area: 'Delivery Completion Rate',
     on_road_safety_score: 'Fantastic', overall_quality_score: 'Fantastic',
-    seatbelt_off_rate: 0, speeding_event_rate: 0.0, distractions_rate: 0.0,
+    seatbelt_off_rate: 0.000, speeding_event_rate: 0.003, distractions_rate: 0.002,
     sign_signal_violations_rate: 0, stop_sign_violations: 0, stop_light_violations: 0, illegal_u_turns: 0,
-    cdf_dpmo: 0, dcr: 0.998, dsb: 0.0, swc_pod: 1.0, swc_cc: 0.0, swc_ad: 0.0,
+    cdf_dpmo: 220, dcr: 0.998, dsb: 0.002, swc_pod: 0.995, swc_cc: 0.001, swc_ad: 0.001,
     dnrs: 2, shipments_per_on_zone_hour: 34.007, pod_opps: 515, cc_opps: 0, customer_escalation_defect: 0,
     customer_delivery_feedback: 0,
   },
@@ -56,9 +56,9 @@ const weeklyMetrics: DspDriverWeeklyMetric[] = [
     week_code: '2025-29', station_code: 'DYY5', transporter_id: 'A2MPQ47UJLPALK',
     delivered_packages: 659, overall_standing: 'Fantastic', key_focus_area: 'Delivery Completion Rate',
     on_road_safety_score: 'Coming Soon', overall_quality_score: 'Fantastic',
-    seatbelt_off_rate: 0, speeding_event_rate: 0.0, distractions_rate: 0.0,
+    seatbelt_off_rate: 0.001, speeding_event_rate: 0.001, distractions_rate: 0.001,
     sign_signal_violations_rate: 0, stop_sign_violations: 0, stop_light_violations: 0, illegal_u_turns: 0,
-    cdf_dpmo: 0, dcr: 0.997, dsb: 0.0, swc_pod: 0.993, swc_cc: 0.0, swc_ad: 0.0,
+    cdf_dpmo: 150, dcr: 0.997, dsb: 0.001, swc_pod: 0.993, swc_cc: 0.001, swc_ad: 0.001,
     dnrs: 0, shipments_per_on_zone_hour: 19.972, pod_opps: 455, cc_opps: 0, customer_escalation_defect: 0,
     customer_delivery_feedback: 0,
   },
@@ -80,7 +80,7 @@ const rules: ComplianceRule[] = [
 ];
 
 const violations: Violation[] = [
-  { transporter_id: 'A1UPD0VQ5XF9L', station_code: 'VNY1', metric_key: 'speeding_event_rate', observed_value: 0.002, threshold_value: 0, severity: 'high', occurred_week: '2025-29', status: 'open' },
+  { transporter_id: 'A1UPD0VQ5XF9L', station_code: 'VNY1', metric_key: 'speeding_event_rate', observed_value: 0.008, threshold_value: 0, severity: 'high', occurred_week: '2025-29', status: 'open' },
   { transporter_id: 'A1TYMBVD1U5VKQ', station_code: 'DYY5', metric_key: 'customer_escalation_defect', observed_value: 2.0, threshold_value: 0, severity: 'high', occurred_week: '2025-29', status: 'open' },
 ];
 
@@ -131,13 +131,24 @@ export class ComplianceService {
     if (idx >= 0) rules[idx] = { ...rules[idx], ...updated };
   }
 
-  static async acknowledgeViolation(id: string): Promise<void> {
-    const v = violations.find(vl => vl.id === id);
-    if (v) v.status = 'acknowledged';
+  static async acknowledgeViolation(idOrComposite: { transporter_id: string; metric_key: string }): Promise<void> {
+    await fetch(`/api/violations/${idOrComposite.transporter_id}/ack`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(idOrComposite)
+    }).catch(() => {});
   }
 
-  static async resolveViolation(id: string): Promise<void> {
-    const v = violations.find(vl => vl.id === id);
-    if (v) v.status = 'resolved';
+  static async resolveViolation(idOrComposite: { transporter_id: string; metric_key: string; reason_code?: string }): Promise<void> {
+    await fetch(`/api/violations/${idOrComposite.transporter_id}/resolve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(idOrComposite)
+    }).catch(() => {});
+  }
+
+  static async escalateViolation(idOrComposite: { transporter_id: string; metric_key: string; level?: string }): Promise<void> {
+    await fetch(`/api/violations/${idOrComposite.transporter_id}/escalate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(idOrComposite)
+    }).catch(() => {});
   }
 } 
