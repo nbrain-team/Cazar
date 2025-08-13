@@ -38,28 +38,39 @@ app.post('/rag/query', async (req, res) => {
 
 // Violations lifecycle
 app.post('/api/violations/:id/ack', async (req, res) => {
-  const { id } = req.params; const { user_id = 'system', note } = req.body || {};
+  const { id } = req.params; const { user_id = 'system', transporter_id, metric_key } = req.body || {};
   try {
-    await pool.query(`UPDATE driver_violations SET status='acknowledged', updated_at=NOW() WHERE id::text=$1 OR id=$1`, [id]);
+    await pool.query(
+      `UPDATE driver_violations SET status='acknowledged', updated_at=NOW()
+       WHERE id::text=$1 OR (COALESCE($2,'')<>'' AND transporter_id=$2 AND metric_key=$3)`,
+      [id, transporter_id || null, metric_key || null]
+    );
     await pool.query(`INSERT INTO api_sync_log (api_source, sync_type, sync_status, records_synced, error_message, started_at, completed_at) VALUES ('amazon_logistics','violation_ack','success',1,NULL,NOW(),NOW())`);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'ack_failed' }); }
 });
 
 app.post('/api/violations/:id/resolve', async (req, res) => {
-  const { id } = req.params; const { user_id = 'system', reason_code='resolved', notes='' } = req.body || {};
+  const { id } = req.params; const { user_id = 'system', reason_code='resolved', notes='', transporter_id, metric_key } = req.body || {};
   try {
-    await pool.query(`UPDATE driver_violations SET status='resolved', occurred_at=occurred_at WHERE id::text=$1 OR id=$1`, [id]);
-    await pool.query(`UPDATE driver_violations SET severity=severity WHERE id::text=$1 OR id=$1`); // no-op placeholder
+    await pool.query(
+      `UPDATE driver_violations SET status='resolved', updated_at=NOW()
+       WHERE id::text=$1 OR (COALESCE($2,'')<>'' AND transporter_id=$2 AND metric_key=$3)`,
+      [id, transporter_id || null, metric_key || null]
+    );
     await pool.query(`INSERT INTO api_sync_log (api_source, sync_type, sync_status, records_synced, error_message, started_at, completed_at) VALUES ('amazon_logistics','violation_resolve','success',1,NULL,NOW(),NOW())`);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'resolve_failed' }); }
 });
 
 app.post('/api/violations/:id/escalate', async (req, res) => {
-  const { id } = req.params; const { level='L2', user_id='system' } = req.body || {};
+  const { id } = req.params; const { level='L2', user_id='system', transporter_id, metric_key } = req.body || {};
   try {
-    await pool.query(`UPDATE driver_violations SET status='escalated' WHERE id::text=$1 OR id=$1`, [id]);
+    await pool.query(
+      `UPDATE driver_violations SET status='escalated', updated_at=NOW()
+       WHERE id::text=$1 OR (COALESCE($2,'')<>'' AND transporter_id=$2 AND metric_key=$3)`,
+      [id, transporter_id || null, metric_key || null]
+    );
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'escalate_failed' }); }
 });
