@@ -64,8 +64,10 @@ export class SmartChatService {
   static async ask(query: string, opts?: SmartChatOptions): Promise<string> {
     const q = query.toLowerCase();
 
-    // If user asks for deep research, route to RAG server
-    if (q.includes('deep') || q.includes('research') || q.includes('rag') || q.includes('vector')) {
+    const isDataDirective = q.trim().startsWith('data:');
+
+    // Prefer RAG for everything except explicit data: directive
+    if (!isDataDirective) {
       try {
         const resp = await fetch('/rag/query', {
           method: 'POST',
@@ -75,14 +77,17 @@ export class SmartChatService {
         const data = await resp.json();
         if (data?.answer) return data.answer;
       } catch (e) {
-        console.warn('RAG call failed, falling back to local analytics', e);
+        // Soft fallback after a short delay so it doesn't feel instantaneous
+        await new Promise(r => setTimeout(r, 500));
       }
     }
 
+    // Strip data: prefix for local analytics
+    const cleaned = isDataDirective ? query.replace(/^data:\s*/i, '') : query;
     const week = opts?.week ?? '2025-29';
-    const stations = parseStations(q, opts?.station);
-    const metrics = findMetricKeys(q);
-    const ops = parseOps(q);
+    const stations = parseStations(cleaned.toLowerCase(), opts?.station);
+    const metrics = findMetricKeys(cleaned.toLowerCase());
+    const ops = parseOps(cleaned.toLowerCase());
 
     // Load weekly metrics for requested stations
     const all = await Promise.all(stations.map(s => ComplianceService.getWeeklyMetrics({ station_code: s, week_code: week })));
@@ -98,9 +103,9 @@ export class SmartChatService {
       metrics.forEach(m => {
         const va = avg((byStation.get(a) || []).map(x => (x as any)[m] || 0));
         const vb = avg((byStation.get(b) || []).map(x => (x as any)[m] || 0));
-        lines.push(`${m} — ${a}: ${fmt(va, m)} vs ${b}: ${fmt(vb, m)} (${diffPct(va, vb)})`);
+        lines.push(`- ${m} — ${a}: ${fmt(va, m)} vs ${b}: ${fmt(vb, m)} (${diffPct(va, vb)})`);
       });
-      return finalize(lines, opts);
+      return `### Comparison\n${lines.join('\n')}`;
     }
 
     // Top / Bottom ranking
@@ -110,9 +115,9 @@ export class SmartChatService {
       const rows = stations.flatMap(s => (byStation.get(s) || []).map(r => ({ ...r, station: s })));
       const ranked = topN(rows, topNumber, r => (r as any)[m] || 0, Boolean(ops.worst));
       ranked.forEach((r, i) => {
-        lines.push(`#${i+1} ${r.station} ${r.transporter_id}: ${m} ${fmt((r as any)[m]||0, m)}; DCR ${fmt(r.dcr||0,'dcr')}; SWC-POD ${fmt(r.swc_pod||0,'swc_pod')}`);
+        lines.push(`${i+1}. ${r.station} ${r.transporter_id} — ${m}: ${fmt((r as any)[m]||0, m)} | DCR ${fmt(r.dcr||0,'dcr')} | SWC-POD ${fmt(r.swc_pod||0,'swc_pod')}`);
       });
-      return finalize(lines, opts);
+      return `### ${ops.worst ? 'Bottom' : 'Top'} ${topNumber} by ${m}\n${lines.join('\n')}`;
     }
 
     // Aggregate (avg/sum)
@@ -122,18 +127,18 @@ export class SmartChatService {
           const rows = byStation.get(s) || [];
           const values = rows.map(x => (x as any)[m] || 0);
           const v = ops.sum ? sum(values) : avg(values);
-          lines.push(`${s} ${ops.sum ? 'total' : 'avg'} ${m}: ${fmt(v, m)}`);
+          lines.push(`- ${s} ${ops.sum ? 'total' : 'avg'} ${m}: ${fmt(v, m)}`);
         });
       });
-      return finalize(lines, opts);
+      return `### Aggregate\n${lines.join('\n')}`;
     }
 
     // Fallback summary
     stations.forEach(s => {
       const rows = byStation.get(s) || [];
-      lines.push(`${s}: drivers ${rows.length}, avg DCR ${fmt(avg(rows.map(r=>r.dcr||0)),'dcr')}, avg SWC-POD ${fmt(avg(rows.map(r=>r.swc_pod||0)),'swc_pod')}, avg CDF DPMO ${fmt(avg(rows.map(r=>r.cdf_dpmo||0)),'cdf_dpmo')}`);
+      lines.push(`- ${s}: drivers ${rows.length}, avg DCR ${fmt(avg(rows.map(r=>r.dcr||0)),'dcr')}, avg SWC-POD ${fmt(avg(rows.map(r=>r.swc_pod||0)),'swc_pod')}, avg CDF DPMO ${fmt(avg(rows.map(r=>r.cdf_dpmo||0)),'cdf_dpmo')}`);
     });
-    return finalize(lines, opts);
+    return `### Summary\n${lines.join('\n')}`;
   }
 }
 
@@ -149,11 +154,4 @@ function diffPct(a: number, b: number) {
   const d = ((a - b) / Math.abs(b)) * 100;
   const sign = d >= 0 ? '+' : '';
   return `${sign}${d.toFixed(1)}%`;
-}
-
-function finalize(lines: string[], opts?: SmartChatOptions) {
-  if (opts?.explain) {
-    return lines.concat(['—', 'Computed over weekly DSP metrics (mock), filtered by station/week context.']).join('\n');
-  }
-  return lines.join('\n');
 } 
