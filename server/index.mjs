@@ -691,7 +691,15 @@ app.get('/api/hos/grid', async (req, res) => {
         }
         dayHours.push(Number((minutes/60).toFixed(2)));
       }
-      const hoursUsed = _hoursUsedAtPure(segs.rows.map(r=>({ startUtc: parseTsUTC(r.start_utc), endUtc: parseTsUTC(r.end_utc) })), end);
+      // Authoritative HOS 168-hour rolling window via SQL overlap to avoid any JS boundary drift
+      const wstart = end.minus({ hours: 168 }).toISO();
+      const usedRow = await client.query(
+        `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(end_utc, $2::timestamptz) - GREATEST(start_utc, $1::timestamptz)))/60),0) AS minutes
+           FROM on_duty_segments
+          WHERE driver_id=$3 AND end_utc > $1 AND start_utc < $2`,
+        [wstart, end.toISO(), d.driver_id]
+      );
+      const hoursUsed = Number(((usedRow.rows?.[0]?.minutes || 0) / 60).toFixed(2));
       const hoursAvailable = 60 - hoursUsed; // allow negative to show overage
       out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours: dayHours, total_7d: Number(dayHours.reduce((a,b)=>a+b,0).toFixed(2)), hours_used: Number(hoursUsed.toFixed(2)), hours_available: Number(hoursAvailable.toFixed(2)) });
     }
