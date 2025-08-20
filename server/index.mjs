@@ -673,35 +673,67 @@ app.get('/api/hos/grid', async (req, res) => {
     );
     const out = [];
     for (const d of drivers) {
-      const segs = await client.query(
-        `SELECT start_utc, end_utc FROM on_duty_segments WHERE driver_id=$1 AND end_utc > $2 AND start_utc < $3 ORDER BY start_utc`,
-        [d.driver_id, start.toISO(), end.toISO()]
-      );
-      // compute daily hours across 7 days in station tz LA
-      const tz = 'America/Los_Angeles';
-      const dayHours = [];
-      for (let i=0; i<7; i++) {
-        const dayStart = start.plus({ days: i });
-        const dayEnd = dayStart.endOf('day');
-        let minutes = 0;
-        for (const s of segs.rows) {
-          const ss = parseTsUTC(s.start_utc);
-          const ee = parseTsUTC(s.end_utc);
-          minutes += _overlapMinutes(ss, ee, dayStart, dayEnd);
-        }
-        dayHours.push(Number((minutes/60).toFixed(2)));
-      }
-      // Authoritative HOS 168-hour rolling window via SQL overlap to avoid any JS boundary drift
       const wstart = end.minus({ hours: 168 }).toISO();
-      const usedRow = await client.query(
-        `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(end_utc, $2::timestamptz) - GREATEST(start_utc, $1::timestamptz)))/60),0) AS minutes
-           FROM on_duty_segments
-          WHERE driver_id=$3 AND end_utc > $1 AND start_utc < $2`,
-        [wstart, end.toISO(), d.driver_id]
+      const wend = end.toISO();
+      // Compute merged (union) intervals inside window, then daily hours and used hours without double counting
+      const dailyRes = await client.query(
+        `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend),
+         segs AS (
+           SELECT GREATEST(start_utc, w.wstart) AS s, LEAST(end_utc, w.wend) AS e
+             FROM on_duty_segments, w
+            WHERE driver_id=$3 AND end_utc > w.wstart AND start_utc < w.wend AND LEAST(end_utc, w.wend) > GREATEST(start_utc, w.wstart)
+         ),
+         ord AS (
+           SELECT s, e, CASE WHEN s > LAG(e) OVER (ORDER BY s) THEN 1 ELSE 0 END AS brk
+             FROM segs
+         ),
+         grp AS (
+           SELECT s, e, SUM(brk) OVER (ORDER BY s ROWS UNBOUNDED PRECEDING) AS g
+             FROM ord
+         ),
+         merged AS (
+           SELECT MIN(s) AS s, MAX(e) AS e FROM grp GROUP BY g
+         ),
+         days AS (
+           SELECT generate_series(date_trunc('day', (SELECT wend FROM w)) - interval '6 days', date_trunc('day', (SELECT wend FROM w)), interval '1 day') AS day
+         ),
+         daily AS (
+           SELECT d.day,
+                  COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(m.e, d.day + interval '1 day') - GREATEST(m.s, d.day)))/3600.0), 0) AS hours
+             FROM days d
+             LEFT JOIN merged m ON m.e > d.day AND m.s < d.day + interval '1 day'
+            GROUP BY d.day
+            ORDER BY d.day
+         )
+         SELECT to_char(day, 'YYYY-MM-DD') AS day, hours FROM daily;`,
+        [wstart, wend, d.driver_id]
       );
-      const hoursUsed = Number(((usedRow.rows?.[0]?.minutes || 0) / 60).toFixed(2));
-      const hoursAvailable = 60 - hoursUsed; // allow negative to show overage
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours: dayHours, total_7d: Number(dayHours.reduce((a,b)=>a+b,0).toFixed(2)), hours_used: Number(hoursUsed.toFixed(2)), hours_available: Number(hoursAvailable.toFixed(2)) });
+      const usedRes = await client.query(
+        `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend),
+         segs AS (
+           SELECT GREATEST(start_utc, w.wstart) AS s, LEAST(end_utc, w.wend) AS e
+             FROM on_duty_segments, w
+            WHERE driver_id=$3 AND end_utc > w.wstart AND start_utc < w.wend AND LEAST(end_utc, w.wend) > GREATEST(start_utc, w.wstart)
+         ),
+         ord AS (
+           SELECT s, e, CASE WHEN s > LAG(e) OVER (ORDER BY s) THEN 1 ELSE 0 END AS brk
+             FROM segs
+         ),
+         grp AS (
+           SELECT s, e, SUM(brk) OVER (ORDER BY s ROWS UNBOUNDED PRECEDING) AS g
+             FROM ord
+         ),
+         merged AS (
+           SELECT MIN(s) AS s, MAX(e) AS e FROM grp GROUP BY g
+         )
+         SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (e - s))/3600.0), 0) AS hours_used FROM merged;`,
+        [wstart, wend, d.driver_id]
+      );
+      const day_hours = dailyRes.rows.map(r => Number(Number(r.hours).toFixed(2)));
+      const hours_used = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
+      const hours_available = Number((60 - hours_used).toFixed(2));
+      const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, total_7d, hours_used, hours_available });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });
