@@ -66,10 +66,9 @@ async function main() {
           [driverId, fullName || driverId]
         );
         const tz = 'America/Los_Angeles';
-        let start = DateTime.fromFormat(inStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
-        if (!start.isValid) start = DateTime.fromFormat(inStr, 'MM/dd/yyyy hh:mm a', { zone: tz });
-        let end = DateTime.fromFormat(outStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
-        if (!end.isValid) end = DateTime.fromFormat(outStr, 'MM/dd/yyyy hh:mm a', { zone: tz });
+        const tryFormats = ['M/d/yyyy H:mm','M/d/yyyy h:mm','MM/dd/yyyy HH:mm','MM/dd/yyyy hh:mm','M/d/yyyy hh:mm a','MM/dd/yyyy hh:mm a','M/d/yyyy hh:mm:ss a','MM/dd/yyyy hh:mm:ss a'];
+        let start = DateTime.invalid('init'); for (const fmt of tryFormats) { start = DateTime.fromFormat(inStr, fmt, { zone: tz }); if (start.isValid) break; }
+        let end = DateTime.invalid('init'); for (const fmt of tryFormats) { end = DateTime.fromFormat(outStr, fmt, { zone: tz }); if (end.isValid) break; }
         if (!start.isValid || !end.isValid) { await client.query('ROLLBACK TO SAVEPOINT sp_row'); skipped++; continue; }
         const startUtc = start.toUTC(); const endAdj = end <= start ? end.plus({ days: 1 }) : end; const endUtc = endAdj.toUTC();
         await client.query(
