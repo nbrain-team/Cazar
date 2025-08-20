@@ -7,7 +7,7 @@ type GridDriver = {
   total_7d: number;
   hours_used: number;
   hours_available: number;
-  lunch_minutes?: number[]; // optional per-day lunch minutes
+  lunch_total_minutes?: number; // aggregated lunch minutes across the window
 };
 
 export default function Hos607Page() {
@@ -58,8 +58,9 @@ export default function Hos607Page() {
             <tr>
               <th style={{ position: 'sticky', left: 0, backgroundColor: 'var(--gray-light)', zIndex: 1 }}>Driver (Position ID)</th>
               {grid && Array.from({ length: 7 }).map((_, i) => (
-                <th key={i}>{i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`}<div style={{ fontSize: '0.7rem', color: '#777' }}>Lunch</div></th>
+                <th key={i}>{i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`}</th>
               ))}
+              <th>Lunch</th>
               <th>7d Total</th>
               <th>Used</th>
               <th>Available</th>
@@ -80,13 +81,13 @@ export default function Hos607Page() {
                         fontWeight: 600
                       }}>
                         {Number(h || 0).toFixed(2)}h
-                        <div style={{ fontSize: '0.7rem', color: '#555' }}>{d.lunch_minutes?.[idx] ? `${Math.round(d.lunch_minutes[idx])}m` : ''}</div>
                       </div>
                     ) : (
                       <span style={{ color: '#999' }}>–</span>
                     )}
                   </td>
                 ))}
+                <td>{d.lunch_total_minutes ? `${Math.round(d.lunch_total_minutes)}m` : '–'}</td>
                 <td>{Number(d.total_7d || 0).toFixed(2)}h</td>
                 <td>{Number(d.hours_used || 0).toFixed(2)}h</td>
                 <td style={{ color: Number(d.hours_available || 0) < 0 ? 'var(--danger)' : Number(d.hours_available || 0) < 3 ? 'var(--warning)' : 'var(--success)' }}>

@@ -733,28 +733,14 @@ app.get('/api/hos/grid', async (req, res) => {
            ORDER BY b.day_start_utc;`,
         [wstart, wend, d.driver_id]
       );
-      const lunchRes = await client.query(
-        `WITH w AS (
-            SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend
-          ),
-          days_local AS (
-            SELECT generate_series(date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))) - interval '6 days',
-                                    date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
-                                    interval '1 day') AS day_local
-          ),
-          bounds AS (
-            SELECT day_local,
-                   (day_local AT TIME ZONE 'America/Los_Angeles') AS day_start_utc,
-                   ((day_local + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS day_end_utc
-              FROM days_local
-          )
-          SELECT to_char(day_start_utc, 'YYYY-MM-DD') AS day,
-                 COALESCE(SUM(CASE WHEN b.start_utc IS NULL OR b.end_utc IS NULL THEN 0
-                                   ELSE EXTRACT(EPOCH FROM (LEAST(b.end_utc, bo.day_end_utc) - GREATEST(b.start_utc, bo.day_start_utc)))/60.0 END), 0) AS minutes
-            FROM bounds bo
-            LEFT JOIN break_segments b ON b.driver_id=$3 AND b.end_utc > bo.day_start_utc AND b.start_utc < bo.day_end_utc
-           GROUP BY day, bo.day_start_utc
-           ORDER BY bo.day_start_utc;`,
+      const lunchTotalRes = await client.query(
+        `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend)
+         SELECT COALESCE(SUM(
+                  CASE WHEN b.start_utc IS NULL OR b.end_utc IS NULL THEN 0
+                       ELSE EXTRACT(EPOCH FROM (LEAST(b.end_utc, w.wend) - GREATEST(b.start_utc, w.wstart)))/60.0 END
+                ),0) AS minutes
+           FROM break_segments b, w
+          WHERE b.driver_id=$3 AND b.end_utc > w.wstart AND b.start_utc < w.wend;`,
         [wstart, wend, d.driver_id]
       );
       const usedRes = await client.query(
@@ -779,11 +765,11 @@ app.get('/api/hos/grid', async (req, res) => {
         [wstart, wend, d.driver_id]
       );
       const day_hours = dailyRes.rows.map(r => Number(Number(r.hours).toFixed(2)));
-      const lunch_minutes = lunchRes.rows.map(r => Number(r.minutes || 0));
+      const lunch_total_minutes = Number(Number(lunchTotalRes.rows?.[0]?.minutes || 0).toFixed(0));
       const hours_used = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
       const hours_available = Number((60 - hours_used).toFixed(2));
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_minutes, total_7d, hours_used, hours_available });
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });
