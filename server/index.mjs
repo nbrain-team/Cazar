@@ -710,29 +710,51 @@ app.get('/api/hos/grid', async (req, res) => {
       const wend = end.toISO();
       // Compute merged (union) intervals inside window, then daily hours and used hours without double counting
       const dailyRes = await client.query(
-        `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend),
-         days AS (
-           SELECT generate_series(date_trunc('day', (SELECT wend FROM w)) - interval '6 days', date_trunc('day', (SELECT wend FROM w)), interval '1 day') AS day
-         )
-         SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
-                COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(s.end_utc, d.day + interval '1 day') - GREATEST(s.start_utc, d.day)))/3600.0), 0) AS hours
-           FROM days d
-           LEFT JOIN on_duty_segments s ON s.driver_id=$3 AND s.end_utc > d.day AND s.start_utc < d.day + interval '1 day'
-          GROUP BY d.day
-          ORDER BY d.day;`,
+        `WITH w AS (
+            SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend
+          ),
+          days_local AS (
+            SELECT generate_series(date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))) - interval '6 days',
+                                    date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
+                                    interval '1 day') AS day_local
+          ),
+          bounds AS (
+            SELECT day_local,
+                   (day_local AT TIME ZONE 'America/Los_Angeles') AS day_start_utc,
+                   ((day_local + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS day_end_utc
+              FROM days_local
+          )
+          SELECT to_char(day_start_utc, 'YYYY-MM-DD') AS day,
+                 COALESCE(SUM(CASE WHEN s.start_utc IS NULL OR s.end_utc IS NULL THEN 0
+                                   ELSE EXTRACT(EPOCH FROM (LEAST(s.end_utc, b.day_end_utc) - GREATEST(s.start_utc, b.day_start_utc)))/3600.0 END), 0) AS hours
+            FROM bounds b
+            LEFT JOIN on_duty_segments s ON s.driver_id=$3 AND s.end_utc > b.day_start_utc AND s.start_utc < b.day_end_utc
+           GROUP BY day, b.day_start_utc
+           ORDER BY b.day_start_utc;`,
         [wstart, wend, d.driver_id]
       );
       const lunchRes = await client.query(
-        `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend),
-         days AS (
-           SELECT generate_series(date_trunc('day', (SELECT wend FROM w)) - interval '6 days', date_trunc('day', (SELECT wend FROM w)), interval '1 day') AS day
-         )
-         SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
-                COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(b.end_utc, d.day + interval '1 day') - GREATEST(b.start_utc, d.day)))/60.0), 0) AS minutes
-           FROM days d
-           LEFT JOIN break_segments b ON b.driver_id=$3 AND b.end_utc > d.day AND b.start_utc < d.day + interval '1 day'
-          GROUP BY d.day
-          ORDER BY d.day;`,
+        `WITH w AS (
+            SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend
+          ),
+          days_local AS (
+            SELECT generate_series(date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))) - interval '6 days',
+                                    date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
+                                    interval '1 day') AS day_local
+          ),
+          bounds AS (
+            SELECT day_local,
+                   (day_local AT TIME ZONE 'America/Los_Angeles') AS day_start_utc,
+                   ((day_local + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS day_end_utc
+              FROM days_local
+          )
+          SELECT to_char(day_start_utc, 'YYYY-MM-DD') AS day,
+                 COALESCE(SUM(CASE WHEN b.start_utc IS NULL OR b.end_utc IS NULL THEN 0
+                                   ELSE EXTRACT(EPOCH FROM (LEAST(b.end_utc, bo.day_end_utc) - GREATEST(b.start_utc, bo.day_start_utc)))/60.0 END), 0) AS minutes
+            FROM bounds bo
+            LEFT JOIN break_segments b ON b.driver_id=$3 AND b.end_utc > bo.day_start_utc AND b.start_utc < bo.day_end_utc
+           GROUP BY day, bo.day_start_utc
+           ORDER BY bo.day_start_utc;`,
         [wstart, wend, d.driver_id]
       );
       const usedRes = await client.query(
