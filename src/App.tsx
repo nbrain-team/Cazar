@@ -14,6 +14,7 @@ import DriversPage from './pages/DriversPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import CompliancePage from './pages/CompliancePage';
+import Hos607Page from './pages/Hos607Page';
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ function App() {
                       <Route path="/drivers" element={<DriversPage />} />
                       <Route path="/compliance" element={<CompliancePage />} />
                       <Route path="/compliance/:tab" element={<CompliancePage />} />
+                      <Route path="/hos-607" element={<Hos607Page />} />
                       <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" />} />

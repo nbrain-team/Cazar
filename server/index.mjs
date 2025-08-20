@@ -10,6 +10,8 @@ import crypto from 'crypto';
 import { parse as csvParse } from 'csv-parse/sync';
 import { DateTime } from 'luxon';
 import cron from 'node-cron';
+import { findHeaderIndex as _findHeaderIndex, parseDayHeaders as _parseDayHeaders, deriveSegmentsFromCell as _deriveSegmentsFromCell } from './lib/csvParser.mjs';
+import { overlapMinutes as _overlapMinutes, hoursUsedAtPure as _hoursUsedAtPure } from './lib/hosCore.mjs';
 
 const app = express();
 app.use(cors());
@@ -542,6 +544,113 @@ app.get('/api/compliance/query', async (req, res) => {
     }
     return res.json({ note: 'unrecognized_query' });
   } catch (e) { console.error(e); res.status(500).json({ error: 'query_failed', detail: String(e) }); }
+  finally { client.release(); }
+});
+
+// ===== HOS 60/7: Import Timecard Report (Position ID based) =====
+app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'file_required' });
+    const text = file.buffer.toString('utf8');
+    // Simple CSV parse: split lines, first row is header with fields including Position ID, In time, Out time
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    if (!lines.length) return res.status(400).json({ error: 'empty_file' });
+    const header = lines[0].split(',');
+    const idx = (name) => header.findIndex(h => h.replace(/"/g,'').trim().toLowerCase() === name.toLowerCase());
+    const iLast = idx('Last Name');
+    const iFirst = idx('First Name');
+    const iPos = idx('Position ID');
+    const iIn = idx('In time');
+    const iOut = idx('Out time');
+    if ([iLast,iFirst,iPos,iIn,iOut].some(x => x < 0)) return res.status(400).json({ error: 'missing_columns' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let rowsIngested = 0; let segs = 0;
+      for (let li = 1; li < lines.length; li++) {
+        const raw = lines[li];
+        if (!raw.trim()) continue;
+        const cols = raw.match(/((?:\"[^\"]*\")|[^,])+/g)?.map(s => s.replace(/^\"|\"$/g,'').trim()) || raw.split(',').map(s => s.trim());
+        const posId = cols[iPos];
+        const fName = cols[iFirst];
+        const lName = cols[iLast];
+        const inStr = cols[iIn];
+        const outStr = cols[iOut];
+        if (!posId || !inStr || !outStr) continue;
+        const driverId = String(posId).trim();
+        const fullName = `${fName || ''} ${lName || ''}`.trim();
+        await client.query(
+          `INSERT INTO drivers (driver_id, driver_name, driver_status, employment_status, created_at, updated_at)
+           VALUES ($1,$2,'active','active', NOW(), NOW())
+           ON CONFLICT (driver_id) DO UPDATE SET driver_name=EXCLUDED.driver_name, updated_at=NOW()`,
+          [driverId, fullName || driverId]
+        );
+        const tz = 'America/Los_Angeles';
+        const start = DateTime.fromFormat(inStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
+        const end = DateTime.fromFormat(outStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
+        if (!start.isValid || !end.isValid) continue;
+        const startUtc = start.toUTC();
+        const endUtc = end <= start ? end.plus({ days: 1 }).toUTC() : end.toUTC();
+        await client.query(
+          `INSERT INTO on_duty_segments (driver_id, upload_id, duty_type, start_utc, end_utc, source_row_ref, confidence)
+           VALUES ($1, NULL, 'worked', $2, $3, $4, 1.0)`,
+          [driverId, startUtc.toISO(), endUtc.toISO(), JSON.stringify({ src: 'timecard_report', line: li })]
+        );
+        segs++; rowsIngested++;
+      }
+      await client.query('COMMIT');
+      res.json({ ok: true, rows: rowsIngested, segments: segs });
+    } catch (e) { await client.query('ROLLBACK'); throw e; }
+    finally { client.release(); }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'import_timecards_failed', detail: String(e) });
+  }
+});
+
+// HOS rolling 7-day grid endpoint
+app.get('/api/hos/grid', async (req, res) => {
+  const endDate = req.query.end || DateTime.now().toISODate();
+  const end = DateTime.fromISO(String(endDate), { zone: 'utc' }).endOf('day');
+  const start = end.minus({ days: 6 }).startOf('day');
+  const client = await pool.connect();
+  try {
+    // load distinct drivers that have segments in window
+    const { rows: drivers } = await client.query(
+      `SELECT DISTINCT d.driver_id, d.driver_name
+         FROM drivers d
+         JOIN on_duty_segments s ON s.driver_id=d.driver_id
+        WHERE s.end_utc > $1 AND s.start_utc < $2`,
+      [start.toISO(), end.toISO()]
+    );
+    const out = [];
+    for (const d of drivers) {
+      const segs = await client.query(
+        `SELECT start_utc, end_utc FROM on_duty_segments WHERE driver_id=$1 AND end_utc > $2 AND start_utc < $3 ORDER BY start_utc`,
+        [d.driver_id, start.toISO(), end.toISO()]
+      );
+      // compute daily hours across 7 days in station tz LA
+      const tz = 'America/Los_Angeles';
+      const dayHours = [];
+      for (let i=0; i<7; i++) {
+        const dayStart = start.plus({ days: i });
+        const dayEnd = dayStart.endOf('day');
+        let minutes = 0;
+        for (const s of segs.rows) {
+          const ss = DateTime.fromISO(s.start_utc, { zone: 'utc' });
+          const ee = DateTime.fromISO(s.end_utc, { zone: 'utc' });
+          minutes += _overlapMinutes(ss, ee, dayStart, dayEnd);
+        }
+        dayHours.push(Number((minutes/60).toFixed(2)));
+      }
+      const hoursUsed = _hoursUsedAtPure(segs.rows.map(r=>({ startUtc: r.start_utc, endUtc: r.end_utc })), end);
+      const hoursAvailable = Math.max(0, 60 - hoursUsed);
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours: dayHours, total_7d: Number(dayHours.reduce((a,b)=>a+b,0).toFixed(2)), hours_used: Number(hoursUsed.toFixed(2)), hours_available: Number(hoursAvailable.toFixed(2)) });
+    }
+    out.sort((a,b)=> a.hours_available - b.hours_available);
+    res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'grid_failed', detail: String(e) }); }
   finally { client.release(); }
 });
 

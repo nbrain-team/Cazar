@@ -23,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ expanded, onToggle }) => {
     { path: '/scheduling', icon: Calendar, label: 'Scheduling' },
     { path: '/drivers', icon: Users, label: 'Drivers' },
     { path: '/compliance', icon: ShieldCheck, label: 'COMPLIANCE' },
+    { path: '/hos-607', icon: ShieldCheck, label: 'Compliance & HOS 60/7' },
     { path: '/reports', icon: FileText, label: 'Reports' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
