@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Tabs } from '@radix-ui/themes';
 import { ComplianceService } from '../services/complianceService';
 import { WhcService } from '../services/whcService';
@@ -37,8 +38,16 @@ function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
 }
 
 export default function CompliancePage() {
+  const { tab: routeTab } = useParams<{ tab?: string }>();
+  const navigate = useNavigate();
   const [station, setStation] = useState<string>('DYY5');
   const [week, setWeek] = useState<string>('2025-29');
+  const [tab, setTab] = useState<string>(routeTab || 'overview');
+  useEffect(() => { if (routeTab && routeTab !== tab) setTab(routeTab); }, [routeTab]);
+  const onTabChange = (next: string) => {
+    setTab(next);
+    navigate(`/compliance/${next}`);
+  };
   const [metrics, setMetrics] = useState<DspDriverWeeklyMetric[]>([]);
   const [violations, setViolations] = useState<Violation[]>([]);
   const [rules, setRules] = useState<ComplianceRule[]>([]);
@@ -125,12 +134,13 @@ export default function CompliancePage() {
         </select>
       </div>
 
-      <Tabs.Root defaultValue="overview">
+      <Tabs.Root value={tab} onValueChange={onTabChange}>
         <Tabs.List style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
           <Tabs.Trigger value="overview" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>OVERVIEW</Tabs.Trigger>
           <Tabs.Trigger value="drivers" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>DRIVERS</Tabs.Trigger>
           <Tabs.Trigger value="violations" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>VIOLATIONS</Tabs.Trigger>
           <Tabs.Trigger value="rules" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>RULES</Tabs.Trigger>
+          <Tabs.Trigger value="uploads" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>Compliance & HOS 60/7</Tabs.Trigger>
           <Tabs.Trigger value="scorecards" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>SCORECARDS</Tabs.Trigger>
           <Tabs.Trigger value="whc" style={{ padding: '0.5rem 0.75rem', borderRadius: 8 }}>WORK HOURS</Tabs.Trigger>
         </Tabs.List>
@@ -358,6 +368,38 @@ export default function CompliancePage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="uploads">
+          <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+            <h3 style={{ fontWeight: 700 }}>Uploads</h3>
+            <p>Ingest weekly schedule/timecard CSVs. Idempotent by digest.</p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget as HTMLFormElement;
+              const input = form.querySelector('input[type="file"]') as HTMLInputElement;
+              if (!input || !input.files || !input.files.length) return;
+              const fd = new FormData();
+              Array.from(input.files).forEach((f) => fd.append('files', f));
+              const resp = await fetch('/api/compliance/uploads', { method: 'POST', body: fd });
+              const json = await resp.json();
+              alert(`Upload completed: ${JSON.stringify(json)}`);
+            }}>
+              <input type="file" multiple accept=".csv" />
+              <button type="submit" className="btn btn-primary" style={{ marginLeft: 8 }}>Import</button>
+            </form>
+          </div>
+
+          <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+            <h3 style={{ fontWeight: 700 }}>Queries</h3>
+            <ul>
+              <li>Which drivers will hit 60 hours in the next 72 hours?</li>
+              <li>Show all drivers with &lt; 3 hours available today.</li>
+              <li>List days this week where staffing failed in DSP-only mode.</li>
+              <li>When is the next roll-off for Driver X?</li>
+              <li>What’s our CoverageRatio7 for station A this week?</li>
+            </ul>
           </div>
         </Tabs.Content>
       </Tabs.Root>

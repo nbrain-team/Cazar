@@ -368,3 +368,90 @@ CREATE TABLE IF NOT EXISTS work_hours_audit_daily (
 CREATE INDEX IF NOT EXISTS idx_whc_audit_date ON work_hours_audit_daily(work_date);
 CREATE INDEX IF NOT EXISTS idx_whc_audit_station ON work_hours_audit_daily(station_code);
 -- END WORK HOURS (WHC) GUARD TABLES 
+
+-- HOS 60/7 COMPLIANCE TABLES (new module)
+
+-- Uploads registry for CSV imports (idempotent by sha256)
+CREATE TABLE IF NOT EXISTS uploads (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    filename TEXT NOT NULL,
+    sha256_digest CHAR(64) UNIQUE NOT NULL,
+    source VARCHAR(50) CHECK (source IN ('timecard_csv')) NOT NULL,
+    week_label VARCHAR(50),
+    station_tz VARCHAR(100) DEFAULT 'America/Los_Angeles',
+    imported_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Extend drivers with optional fields needed for HOS module
+ALTER TABLE drivers
+    ADD COLUMN IF NOT EXISTS external_employee_id VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS eligible_vehicle_classes JSONB,
+    ADD COLUMN IF NOT EXISTS hire_date DATE;
+
+-- Canonical on-duty segments derived from schedules/timecards
+CREATE TABLE IF NOT EXISTS on_duty_segments (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    driver_id VARCHAR(50) NOT NULL REFERENCES drivers(driver_id),
+    upload_id UUID NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
+    duty_type VARCHAR(20) CHECK (duty_type IN ('scheduled','worked','pretrip','posttrip','meeting','training','fueling','other')) NOT NULL,
+    start_utc TIMESTAMPTZ NOT NULL,
+    end_utc   TIMESTAMPTZ NOT NULL,
+    minutes   INTEGER GENERATED ALWAYS AS (GREATEST(0, (EXTRACT(EPOCH FROM (end_utc - start_utc)) / 60)::INT)) STORED,
+    source_row_ref JSONB,
+    confidence NUMERIC(3,2) DEFAULT 1.00,
+    notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_on_duty_segments_driver_time ON on_duty_segments(driver_id, start_utc, end_utc);
+
+-- Daily routes/coverage facts
+CREATE TABLE IF NOT EXISTS routes_day (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    service_date DATE NOT NULL,
+    station_id VARCHAR(50),
+    routes_assigned INTEGER,
+    routes_staffed_dsp_only INTEGER,
+    routes_staffed_inclusive INTEGER,
+    source VARCHAR(20) CHECK (source IN ('manual','import','api')) DEFAULT 'import',
+    upload_id UUID REFERENCES uploads(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_routes_day_date ON routes_day(service_date);
+
+-- HOS rolling 7-day rollups (recomputed on demand/nightly)
+CREATE TABLE IF NOT EXISTS hos_rollups_7d (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    driver_id VARCHAR(50) NOT NULL REFERENCES drivers(driver_id),
+    as_of_utc TIMESTAMPTZ NOT NULL,
+    hours_used NUMERIC(5,2) NOT NULL,
+    hours_available NUMERIC(5,2) NOT NULL,
+    hos_limit NUMERIC(5,2) NOT NULL DEFAULT 60,
+    restart_detected BOOLEAN DEFAULT FALSE,
+    restart_ended_at_utc TIMESTAMPTZ,
+    projected_violation_at_utc TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_hos_rollups_asof ON hos_rollups_7d(driver_id, as_of_utc DESC);
+
+-- Staffing coverage 7d rollups
+CREATE TABLE IF NOT EXISTS staffing_rollups_7d (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    service_date DATE NOT NULL,
+    window_start_date DATE NOT NULL,
+    window_end_date DATE NOT NULL,
+    routes_assigned_7d INTEGER NOT NULL,
+    routes_staffed_dsp_only_7d INTEGER NOT NULL,
+    coverage_ratio_dsp_only NUMERIC(6,3) NOT NULL,
+    daily_flags JSONB,
+    window_pass BOOLEAN NOT NULL
+);
+
+-- Driver-attested second-job minutes (counted as on-duty)
+CREATE TABLE IF NOT EXISTS driver_attestations (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    driver_id VARCHAR(50) NOT NULL REFERENCES drivers(driver_id),
+    other_employer_minutes_last7d INTEGER NOT NULL,
+    effective_utc TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

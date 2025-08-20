@@ -1,3 +1,23 @@
+## Compliance & HOS 60/7 Module
+
+Bold sections in the UI match platform theme and typography.
+
+Endpoints:
+
+- `POST /api/compliance/uploads` (multipart `files`) — ingest weekly schedule/timecard CSVs like `example1.csv` and `example2.csv`. Idempotent via `uploads.sha256_digest`.
+- `GET /api/compliance/hos/:driverId/now` — current HOS counters.
+- `POST /api/compliance/dispatch/check` — pre-dispatch gating.
+- `GET /api/compliance/staffing/rollup?from=YYYY-MM-DD&to=YYYY-MM-DD&mode=dsp|inclusive` — coverage and window status.
+- `GET /api/compliance/alerts` — pending/active alerts.
+- `POST /api/compliance/driver-attestation` — second-job minutes.
+- `POST /api/compliance/seed-examples` — local helper to load `example1.csv` and `example2.csv` from repo.
+
+New tables in `database/schema.sql`:
+
+- `uploads`, `on_duty_segments`, `routes_day`, `hos_rollups_7d`, `staffing_rollups_7d`, `driver_attestations`.
+
+Background jobs: `node-cron` placeholder @02:00.
+
 # Cazar AI Ops Hub
 
 An AI-powered operations management platform for Cazar NYC, focusing on timecard reconciliation and automated scheduling optimization.

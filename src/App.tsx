@@ -41,6 +41,7 @@ function App() {
                       <Route path="/scheduling" element={<SchedulingPage />} />
                       <Route path="/drivers" element={<DriversPage />} />
                       <Route path="/compliance" element={<CompliancePage />} />
+                      <Route path="/compliance/:tab" element={<CompliancePage />} />
                       <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" />} />
