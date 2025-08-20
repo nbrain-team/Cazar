@@ -553,7 +553,26 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'file_required' });
     const buffer = file.buffer;
-    const records = csvParse(buffer.toString('utf8'), { relaxColumnCount: true });
+    let records;
+    try {
+      records = csvParse(buffer.toString('utf8'), {
+        relaxColumnCount: true,
+        relaxQuotes: true,
+        skipEmptyLines: true,
+        bom: true,
+        trim: true
+      });
+    } catch (err) {
+      // Fallback: aggressively relax quotes handling
+      records = csvParse(buffer.toString('utf8'), {
+        relaxColumnCount: true,
+        relaxQuotes: true,
+        skipEmptyLines: true,
+        bom: true,
+        trim: true,
+        quote: '\u0000' // effectively disable quote processing
+      });
+    }
     if (!records || !records.length) return res.status(400).json({ error: 'empty_file' });
     const header = records[0].map((h) => String(h || '').replace(/"/g, '').trim());
     const idx = (name) => header.findIndex(h => h.toLowerCase() === name.toLowerCase());
