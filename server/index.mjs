@@ -552,12 +552,11 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'file_required' });
-    const text = file.buffer.toString('utf8');
-    // Simple CSV parse: split lines, first row is header with fields including Position ID, In time, Out time
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    if (!lines.length) return res.status(400).json({ error: 'empty_file' });
-    const header = lines[0].split(',');
-    const idx = (name) => header.findIndex(h => h.replace(/"/g,'').trim().toLowerCase() === name.toLowerCase());
+    const buffer = file.buffer;
+    const records = csvParse(buffer.toString('utf8'), { relaxColumnCount: true });
+    if (!records || !records.length) return res.status(400).json({ error: 'empty_file' });
+    const header = records[0].map((h) => String(h || '').replace(/"/g, '').trim());
+    const idx = (name) => header.findIndex(h => h.toLowerCase() === name.toLowerCase());
     const iLast = idx('Last Name');
     const iFirst = idx('First Name');
     const iPos = idx('Position ID');
@@ -567,19 +566,28 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Create uploads row for FK and idempotency
+      const digest = sha256(buffer);
+      let uploadId;
+      try {
+        const ins = await client.query(`INSERT INTO uploads (filename, sha256_digest, source, week_label) VALUES ($1,$2,'timecard_csv',NULL) RETURNING id`, [file.originalname || 'Timecard Report.csv', digest]);
+        uploadId = ins.rows[0].id;
+      } catch (e) {
+        const sel = await client.query(`SELECT id FROM uploads WHERE sha256_digest=$1`, [digest]);
+        uploadId = sel.rows[0]?.id;
+      }
       let rowsIngested = 0; let segs = 0;
-      for (let li = 1; li < lines.length; li++) {
-        const raw = lines[li];
-        if (!raw.trim()) continue;
-        const cols = raw.match(/((?:\"[^\"]*\")|[^,])+/g)?.map(s => s.replace(/^\"|\"$/g,'').trim()) || raw.split(',').map(s => s.trim());
-        const posId = cols[iPos];
-        const fName = cols[iFirst];
-        const lName = cols[iLast];
-        const inStr = cols[iIn];
-        const outStr = cols[iOut];
+      for (let li = 1; li < records.length; li++) {
+        const row = records[li];
+        if (!row || !row.length) continue;
+        const posId = String(row[iPos] || '').trim();
+        const fName = String(row[iFirst] || '').trim();
+        const lName = String(row[iLast] || '').trim();
+        const inStr = String(row[iIn] || '').trim();
+        const outStr = String(row[iOut] || '').trim();
         if (!posId || !inStr || !outStr) continue;
-        const driverId = String(posId).trim();
-        const fullName = `${fName || ''} ${lName || ''}`.trim();
+        const driverId = posId;
+        const fullName = `${fName} ${lName}`.trim();
         await client.query(
           `INSERT INTO drivers (driver_id, driver_name, driver_status, employment_status, created_at, updated_at)
            VALUES ($1,$2,'active','active', NOW(), NOW())
@@ -587,20 +595,23 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
           [driverId, fullName || driverId]
         );
         const tz = 'America/Los_Angeles';
-        const start = DateTime.fromFormat(inStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
-        const end = DateTime.fromFormat(outStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
+        let start = DateTime.fromFormat(inStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
+        if (!start.isValid) start = DateTime.fromFormat(inStr, 'MM/dd/yyyy hh:mm a', { zone: tz });
+        let end = DateTime.fromFormat(outStr, 'MM/dd/yyyy hh:mm:ss a', { zone: tz });
+        if (!end.isValid) end = DateTime.fromFormat(outStr, 'MM/dd/yyyy hh:mm a', { zone: tz });
         if (!start.isValid || !end.isValid) continue;
         const startUtc = start.toUTC();
-        const endUtc = end <= start ? end.plus({ days: 1 }).toUTC() : end.toUTC();
+        const endAdj = end <= start ? end.plus({ days: 1 }) : end;
+        const endUtc = endAdj.toUTC();
         await client.query(
           `INSERT INTO on_duty_segments (driver_id, upload_id, duty_type, start_utc, end_utc, source_row_ref, confidence)
-           VALUES ($1, NULL, 'worked', $2, $3, $4, 1.0)`,
-          [driverId, startUtc.toISO(), endUtc.toISO(), JSON.stringify({ src: 'timecard_report', line: li })]
+           VALUES ($1, $2, 'worked', $3, $4, $5, 1.0)`,
+          [driverId, uploadId, startUtc.toISO(), endUtc.toISO(), JSON.stringify({ src: 'timecard_report', line: li })]
         );
         segs++; rowsIngested++;
       }
       await client.query('COMMIT');
-      res.json({ ok: true, rows: rowsIngested, segments: segs });
+      res.json({ ok: true, rows: rowsIngested, segments: segs, upload_id: uploadId });
     } catch (e) { await client.query('ROLLBACK'); throw e; }
     finally { client.release(); }
   } catch (e) {
