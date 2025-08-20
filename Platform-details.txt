@@ -6,3 +6,8 @@ Render URL: https://cazar-main.onrender.com
 
 Database Details: 
 Name=cazar-db
+Databse=cazar_ops_hub
+un=cazar_admin
+pw=7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke
+External url=postgresql://cazar_admin:7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke@dpg-d25rt60gjchc73acglmg-a.oregon-postgres.render.com/cazar_ops_hub
+Internal url=postgresql://cazar_admin:7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke@dpg-d25rt60gjchc73acglmg-a/cazar_ops_hub
