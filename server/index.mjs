@@ -692,7 +692,7 @@ app.get('/api/hos/grid', async (req, res) => {
         dayHours.push(Number((minutes/60).toFixed(2)));
       }
       const hoursUsed = _hoursUsedAtPure(segs.rows.map(r=>({ startUtc: parseTsUTC(r.start_utc), endUtc: parseTsUTC(r.end_utc) })), end);
-      const hoursAvailable = Math.max(0, 60 - hoursUsed);
+      const hoursAvailable = 60 - hoursUsed; // allow negative to show overage
       out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours: dayHours, total_7d: Number(dayHours.reduce((a,b)=>a+b,0).toFixed(2)), hours_used: Number(hoursUsed.toFixed(2)), hours_available: Number(hoursAvailable.toFixed(2)) });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);

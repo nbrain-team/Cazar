@@ -87,7 +87,9 @@ export default function Hos607Page() {
                 ))}
                 <td>{Number(d.total_7d || 0).toFixed(2)}h</td>
                 <td>{Number(d.hours_used || 0).toFixed(2)}h</td>
-                <td style={{ color: Number(d.hours_available || 0) <= 0 ? 'var(--danger)' : Number(d.hours_available || 0) < 3 ? 'var(--warning)' : 'var(--success)' }}>{Number(d.hours_available || 0).toFixed(2)}h</td>
+                <td style={{ color: Number(d.hours_available || 0) < 0 ? 'var(--danger)' : Number(d.hours_available || 0) < 3 ? 'var(--warning)' : 'var(--success)' }}>
+                  {Number(d.hours_available || 0).toFixed(2)}h
+                </td>
               </tr>
             ))}
             {sorted.length === 0 && (
