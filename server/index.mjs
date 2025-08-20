@@ -647,6 +647,32 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
              VALUES ($1, $2, 'worked', $3, $4, $5, 1.0)`,
             [driverId, uploadId, startUtc.toISO(), endUtc.toISO(), JSON.stringify({ src: 'timecard_report', line: li })]
           );
+        // If this row indicates an LP (lunch punch marker) in column I (Out Punch Type == 'LP'),
+        // create a break segment from this row's end to the next row's start for the same employee
+        if (iOutType >= 0 && String(row[iOutType] || '').trim().toUpperCase() === 'LP') {
+          // find next row for same Position ID
+          for (let j = li + 1; j < records.length; j++) {
+            const next = records[j];
+            if (!next || !next.length) continue;
+            const nextPos = String(next[iPos] || '').trim();
+            const nextIn = String(next[iIn] || '').trim();
+            if (nextPos !== posId) continue;
+            // parse nextIn
+            let nextStart = DateTime.invalid('init');
+            for (const fmt of tryFormats) { nextStart = DateTime.fromFormat(nextIn, fmt, { zone: tz }); if (nextStart.isValid) break; }
+            if (!nextStart.isValid) break;
+            const lunchStartUtc = endUtc; // end of current worked row
+            const lunchEndUtc = nextStart.toUTC();
+            if (lunchEndUtc > lunchStartUtc) {
+              await client.query(
+                `INSERT INTO break_segments (driver_id, upload_id, label, start_utc, end_utc, source_row_ref)
+                 VALUES ($1, $2, 'Lunch', $3, $4, $5)`,
+                [driverId, uploadId, lunchStartUtc.toISO(), lunchEndUtc.toISO(), JSON.stringify({ from_line: li, to_line: j })]
+              );
+            }
+            break;
+          }
+        }
           segs++; rowsIngested++;
         } catch (rowErr) {
           await client.query('ROLLBACK TO SAVEPOINT sp_row');
@@ -685,34 +711,28 @@ app.get('/api/hos/grid', async (req, res) => {
       // Compute merged (union) intervals inside window, then daily hours and used hours without double counting
       const dailyRes = await client.query(
         `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend),
-         segs AS (
-           SELECT GREATEST(start_utc, w.wstart) AS s, LEAST(end_utc, w.wend) AS e
-             FROM on_duty_segments, w
-            WHERE driver_id=$3 AND end_utc > w.wstart AND start_utc < w.wend AND LEAST(end_utc, w.wend) > GREATEST(start_utc, w.wstart)
-         ),
-         ord AS (
-           SELECT s, e, CASE WHEN s > LAG(e) OVER (ORDER BY s) THEN 1 ELSE 0 END AS brk
-             FROM segs
-         ),
-         grp AS (
-           SELECT s, e, SUM(brk) OVER (ORDER BY s ROWS UNBOUNDED PRECEDING) AS g
-             FROM ord
-         ),
-         merged AS (
-           SELECT MIN(s) AS s, MAX(e) AS e FROM grp GROUP BY g
-         ),
          days AS (
            SELECT generate_series(date_trunc('day', (SELECT wend FROM w)) - interval '6 days', date_trunc('day', (SELECT wend FROM w)), interval '1 day') AS day
-         ),
-         daily AS (
-           SELECT d.day,
-                  COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(m.e, d.day + interval '1 day') - GREATEST(m.s, d.day)))/3600.0), 0) AS hours
-             FROM days d
-             LEFT JOIN merged m ON m.e > d.day AND m.s < d.day + interval '1 day'
-            GROUP BY d.day
-            ORDER BY d.day
          )
-         SELECT to_char(day, 'YYYY-MM-DD') AS day, hours FROM daily;`,
+         SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+                COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(s.end_utc, d.day + interval '1 day') - GREATEST(s.start_utc, d.day)))/3600.0), 0) AS hours
+           FROM days d
+           LEFT JOIN on_duty_segments s ON s.driver_id=$3 AND s.end_utc > d.day AND s.start_utc < d.day + interval '1 day'
+          GROUP BY d.day
+          ORDER BY d.day;`,
+        [wstart, wend, d.driver_id]
+      );
+      const lunchRes = await client.query(
+        `WITH w AS (SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend),
+         days AS (
+           SELECT generate_series(date_trunc('day', (SELECT wend FROM w)) - interval '6 days', date_trunc('day', (SELECT wend FROM w)), interval '1 day') AS day
+         )
+         SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+                COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(b.end_utc, d.day + interval '1 day') - GREATEST(b.start_utc, d.day)))/60.0), 0) AS minutes
+           FROM days d
+           LEFT JOIN break_segments b ON b.driver_id=$3 AND b.end_utc > d.day AND b.start_utc < d.day + interval '1 day'
+          GROUP BY d.day
+          ORDER BY d.day;`,
         [wstart, wend, d.driver_id]
       );
       const usedRes = await client.query(
@@ -737,10 +757,11 @@ app.get('/api/hos/grid', async (req, res) => {
         [wstart, wend, d.driver_id]
       );
       const day_hours = dailyRes.rows.map(r => Number(Number(r.hours).toFixed(2)));
+      const lunch_minutes = lunchRes.rows.map(r => Number(r.minutes || 0));
       const hours_used = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
       const hours_available = Number((60 - hours_used).toFixed(2));
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, total_7d, hours_used, hours_available });
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_minutes, total_7d, hours_used, hours_available });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });

@@ -404,6 +404,21 @@ CREATE TABLE IF NOT EXISTS on_duty_segments (
 
 CREATE INDEX IF NOT EXISTS idx_on_duty_segments_driver_time ON on_duty_segments(driver_id, start_utc, end_utc);
 
+-- Off-duty break segments (e.g., Lunch) that should NOT count toward HOS
+CREATE TABLE IF NOT EXISTS break_segments (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    driver_id VARCHAR(50) NOT NULL REFERENCES drivers(driver_id),
+    upload_id UUID REFERENCES uploads(id) ON DELETE SET NULL,
+    label VARCHAR(50) DEFAULT 'Lunch',
+    start_utc TIMESTAMPTZ NOT NULL,
+    end_utc   TIMESTAMPTZ NOT NULL,
+    minutes   INTEGER GENERATED ALWAYS AS (GREATEST(0, (EXTRACT(EPOCH FROM (end_utc - start_utc)) / 60)::INT)) STORED,
+    source_row_ref JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_break_segments_driver_time ON break_segments(driver_id, start_utc, end_utc);
+
 -- Daily routes/coverage facts
 CREATE TABLE IF NOT EXISTS routes_day (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
