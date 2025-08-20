@@ -288,6 +288,15 @@ function overlapMinutes(aStart, aEnd, bStart, bEnd) {
   return Math.max(0, Math.floor((end - start) / 60000));
 }
 
+function parseTsUTC(ts) {
+  if (!ts) return DateTime.invalid('empty');
+  if (ts instanceof Date) return DateTime.fromJSDate(ts, { zone: 'utc' });
+  const s = String(ts);
+  let dt = DateTime.fromISO(s, { zone: 'utc' });
+  if (!dt.isValid) dt = DateTime.fromSQL(s, { zone: 'utc' });
+  return dt;
+}
+
 async function hoursUsedAt(client, driverId, nowUtc) {
   const windowStart = nowUtc.minus({ hours: 168 });
   const { rows } = await client.query(
@@ -296,8 +305,8 @@ async function hoursUsedAt(client, driverId, nowUtc) {
   );
   let minutes = 0;
   for (const row of rows) {
-    const s = DateTime.fromISO(row.start_utc, { zone: 'utc' });
-    const e = DateTime.fromISO(row.end_utc, { zone: 'utc' });
+    const s = parseTsUTC(row.start_utc);
+    const e = parseTsUTC(row.end_utc);
     minutes += overlapMinutes(s, e, windowStart, nowUtc);
   }
   // Second-job minutes
@@ -676,8 +685,8 @@ app.get('/api/hos/grid', async (req, res) => {
         const dayEnd = dayStart.endOf('day');
         let minutes = 0;
         for (const s of segs.rows) {
-          const ss = DateTime.fromISO(s.start_utc, { zone: 'utc' });
-          const ee = DateTime.fromISO(s.end_utc, { zone: 'utc' });
+          const ss = parseTsUTC(s.start_utc);
+          const ee = parseTsUTC(s.end_utc);
           minutes += _overlapMinutes(ss, ee, dayStart, dayEnd);
         }
         dayHours.push(Number((minutes/60).toFixed(2)));
