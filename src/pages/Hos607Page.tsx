@@ -70,24 +70,24 @@ export default function Hos607Page() {
                 <td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--card-bg)', zIndex: 1 }}>{d.driver_name} ({d.driver_id})</td>
                 {d.day_hours.map((h, idx) => (
                   <td key={idx}>
-                    {h > 0 ? (
+                    {Number(h || 0) > 0 ? (
                       <div style={{
                         padding: '0.25rem 0.5rem',
-                        backgroundColor: h >= 10 ? 'var(--danger-light)' : h >= 8 ? 'var(--warning-light)' : 'var(--primary-light)',
+                        backgroundColor: Number(h || 0) >= 10 ? 'var(--danger-light)' : Number(h || 0) >= 8 ? 'var(--warning-light)' : 'var(--primary-light)',
                         borderRadius: 4,
                         textAlign: 'center',
                         fontWeight: 600
                       }}>
-                        {h.toFixed(2)}h
+                        {Number(h || 0).toFixed(2)}h
                       </div>
                     ) : (
                       <span style={{ color: '#999' }}>–</span>
                     )}
                   </td>
                 ))}
-                <td>{d.total_7d.toFixed(2)}h</td>
-                <td>{d.hours_used.toFixed(2)}h</td>
-                <td style={{ color: d.hours_available <= 0 ? 'var(--danger)' : d.hours_available < 3 ? 'var(--warning)' : 'var(--success)' }}>{d.hours_available.toFixed(2)}h</td>
+                <td>{Number(d.total_7d || 0).toFixed(2)}h</td>
+                <td>{Number(d.hours_used || 0).toFixed(2)}h</td>
+                <td style={{ color: Number(d.hours_available || 0) <= 0 ? 'var(--danger)' : Number(d.hours_available || 0) < 3 ? 'var(--warning)' : 'var(--success)' }}>{Number(d.hours_available || 0).toFixed(2)}h</td>
               </tr>
             ))}
             {sorted.length === 0 && (
