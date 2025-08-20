@@ -590,6 +590,7 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
     const iPos = idx('Position ID');
     const iIn = idx('In time');
     const iOut = idx('Out time');
+    const iOutType = idx('Out Punch Type');
     if ([iLast,iFirst,iPos,iIn,iOut].some(x => x < 0)) return res.status(400).json({ error: 'missing_columns' });
     const client = await pool.connect();
     try {
@@ -615,6 +616,8 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
         const lName = String(row[iLast] || '').trim();
         const inStr = String(row[iIn] || '').trim();
         const outStr = String(row[iOut] || '').trim();
+        const outType = iOutType >= 0 ? String(row[iOutType] || '').trim() : '';
+        if (outType.toUpperCase() === 'PTO') { skipped++; continue; }
         if (!posId || !inStr || !outStr) { skipped++; continue; }
         const driverId = posId;
         const fullName = `${fName} ${lName}`.trim();
