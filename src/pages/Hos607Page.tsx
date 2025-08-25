@@ -8,6 +8,8 @@ type GridDriver = {
   hours_used: number;
   hours_available: number;
   lunch_total_minutes?: number; // aggregated lunch minutes across the window
+  status?: 'OK' | 'AT_RISK' | 'VIOLATION';
+  detail?: string;
 };
 
 export default function Hos607Page() {
@@ -61,6 +63,7 @@ export default function Hos607Page() {
                 <th key={i}>{i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`}</th>
               ))}
               <th>Lunch</th>
+              <th>Status</th>
               <th>7d Total</th>
               <th>Used</th>
               <th>Available</th>
@@ -88,6 +91,13 @@ export default function Hos607Page() {
                   </td>
                 ))}
                 <td>{d.lunch_total_minutes ? `${Math.round(d.lunch_total_minutes)}m` : '–'}</td>
+                <td>
+                  {d.status ? (
+                    <span className={`badge ${d.status === 'VIOLATION' ? 'badge-danger' : d.status === 'AT_RISK' ? 'badge-warning' : 'badge-success'}`} title={d.detail || ''}>
+                      {d.status.replace('_', ' ')}
+                    </span>
+                  ) : 'OK'}
+                </td>
                 <td>{Number(d.total_7d || 0).toFixed(2)}h</td>
                 <td>{Number(d.hours_used || 0).toFixed(2)}h</td>
                 <td style={{ color: Number(d.hours_available || 0) < 0 ? 'var(--danger)' : Number(d.hours_available || 0) < 3 ? 'var(--warning)' : 'var(--success)' }}>

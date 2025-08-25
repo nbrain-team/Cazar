@@ -768,8 +768,70 @@ app.get('/api/hos/grid', async (req, res) => {
       const lunch_total_minutes = Number(Number(lunchTotalRes.rows?.[0]?.minutes || 0).toFixed(0));
       const hours_used = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
       const hours_available = Number((60 - hours_used).toFixed(2));
+      // Policy thresholds (could be pulled from work_hours_policy_profiles)
+      const meal_required_by_hour = 6; // require meal by 6th on-duty hour
+      const meal_min_minutes = 30;    // 30-min minimum
+      const min_rest_hours_between_shifts = 10; // short rest threshold
+      const daily_max_hours = 12;     // daily max on-duty threshold
+      // Evaluate meal in window: within the last day, look for any break >= 30m occurring by 6th hour of on-duty
+      const mealOkRow = await client.query(
+        `WITH day_bounds AS (
+           SELECT date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles' AS s,
+                  (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day') AT TIME ZONE 'America/Los_Angeles' AS e
+         ), onday AS (
+           SELECT * FROM on_duty_segments, day_bounds db WHERE driver_id=$1 AND end_utc > db.s AND start_utc < db.e
+         ), accum AS (
+           SELECT SUM(EXTRACT(EPOCH FROM (LEAST(end_utc, db.e) - GREATEST(start_utc, db.s))))/3600.0 AS on_hours
+             FROM onday od, day_bounds db
+         ), breaks AS (
+           SELECT EXTRACT(EPOCH FROM (LEAST(b.end_utc, db.e) - GREATEST(b.start_utc, db.s)))/60.0 AS minutes,
+                  (SELECT on_hours FROM accum) AS on_hours
+             FROM break_segments b, day_bounds db
+            WHERE b.driver_id=$1 AND b.end_utc > db.s AND b.start_utc < db.e
+         )
+         SELECT COALESCE(MAX(CASE WHEN minutes >= $3 AND on_hours >= $4 THEN 1 ELSE 0 END),0) AS meal_ok FROM breaks;`,
+        [d.driver_id, end.toISO(), meal_min_minutes, meal_required_by_hour]
+      );
+      const meal_ok = Number(mealOkRow.rows?.[0]?.meal_ok || 0) === 1;
+      // Short rest: rest between last end on prior day and first start today
+      const restRow = await client.query(
+        `WITH bounds AS (
+           SELECT (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles') AS s,
+                  ((date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS e
+         ), segs AS (
+           SELECT start_utc, end_utc FROM on_duty_segments, bounds b WHERE driver_id=$1 AND end_utc > b.s - interval '1 day' AND start_utc < b.e
+         ), prior AS (
+           SELECT MAX(end_utc) AS last_end FROM segs, bounds b WHERE end_utc < b.s
+         ), today AS (
+           SELECT MIN(start_utc) AS first_start FROM segs, bounds b WHERE start_utc >= b.s AND start_utc < b.e
+         )
+         SELECT EXTRACT(EPOCH FROM (t.first_start - p.last_end))/3600.0 AS rest_hours
+           FROM prior p, today t;`,
+        [d.driver_id, end.toISO()]
+      );
+      const rest_hours = Number(restRow.rows?.[0]?.rest_hours || 0);
+      // Daily max: sum on-duty hours for the most recent local day
+      const dailyRow = await client.query(
+        `WITH b AS (
+           SELECT date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles' AS s,
+                  (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day') AT TIME ZONE 'America/Los_Angeles' AS e
+         )
+         SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(s.end_utc, b.e) - GREATEST(s.start_utc, b.s)))/3600.0),0) AS daily_hours
+           FROM on_duty_segments s, b
+          WHERE s.driver_id=$1 AND s.end_utc > b.s AND s.start_utc < b.e;`,
+        [d.driver_id, end.toISO()]
+      );
+      const daily_hours = Number(dailyRow.rows?.[0]?.daily_hours || 0);
+      // Build status chip
+      let status = 'OK';
+      let detail = '';
+      if (hours_available < 0) { status = 'VIOLATION'; detail = 'Over 60/7 cap'; }
+      else if (hours_available < 2) { status = 'AT_RISK'; detail = 'Near 60/7 cap'; }
+      if (!meal_ok) { status = status === 'VIOLATION' ? status : 'AT_RISK'; detail = detail ? detail + '; Meal due' : 'Meal due'; }
+      if (rest_hours > 0 && rest_hours < min_rest_hours_between_shifts) { status = 'VIOLATION'; detail = detail ? detail + '; Short rest' : 'Short rest'; }
+      if (daily_hours > daily_max_hours) { status = 'VIOLATION'; detail = detail ? detail + '; Daily max exceeded' : 'Daily max exceeded'; }
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available });
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });
