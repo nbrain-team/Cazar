@@ -694,7 +694,8 @@ app.get('/api/hos/grid', async (req, res) => {
   const endDate = req.query.end || DateTime.now().toISODate();
   const end = DateTime.fromISO(String(endDate), { zone: 'utc' }).endOf('day');
   const endLocal = DateTime.fromISO(String(endDate), { zone: 'America/Los_Angeles' }).endOf('day');
-  const start = end.minus({ days: 6 }).startOf('day');
+  const viewDays = Math.max(7, Math.min(42, Number.parseInt(String(req.query.days || '7')) || 7));
+  const start = end.minus({ days: viewDays - 1 }).startOf('day');
   const client = await pool.connect();
   try {
     // Build day labels and dates in America/Los_Angeles to align with the grid
@@ -703,6 +704,15 @@ app.get('/api/hos/grid', async (req, res) => {
       const label = i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6 - i}`;
       return { label, iso: dayLocal.toISODate(), mmdd: dayLocal.toFormat('MM/dd') };
     });
+    // Adjust for variable viewDays
+    if (viewDays !== 7) {
+      const computed = Array.from({ length: viewDays }).map((_, i) => {
+        const dayLocal = endLocal.minus({ days: (viewDays - 1) - i });
+        const label = i === viewDays - 1 ? 'D' : `D-${(viewDays - 1) - i}`;
+        return { label, iso: dayLocal.toISODate(), mmdd: dayLocal.toFormat('MM/dd') };
+      });
+      days.splice(0, days.length, ...computed);
+    }
     // load distinct drivers that have segments in window
     const { rows: drivers } = await client.query(
       `SELECT DISTINCT d.driver_id, d.driver_name
@@ -721,9 +731,10 @@ app.get('/api/hos/grid', async (req, res) => {
             SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend
           ),
           days_local AS (
-            SELECT generate_series(date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))) - interval '6 days',
-                                    date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
-                                    interval '1 day') AS day_local
+            SELECT generate_series(
+                     date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))) - interval '${viewDays - 1} days',
+                     date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
+                     interval '1 day') AS day_local
           ),
           bounds AS (
             SELECT day_local,

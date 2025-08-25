@@ -19,15 +19,16 @@ export default function Hos607Page() {
   const [grid, setGrid] = useState<{ window: { start: string; end: string }, days?: { label: string; iso: string; mmdd: string }[], drivers: GridDriver[] } | null>(null);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [uploading, setUploading] = useState(false);
+  const [viewDays, setViewDays] = useState<number>(7);
   const [openRow, setOpenRow] = useState<string | null>(null);
 
   const load = async () => {
-    const r = await fetch(`/api/hos/grid?end=${endDate}`);
+    const r = await fetch(`/api/hos/grid?end=${endDate}&days=${viewDays}`);
     const j = await r.json();
     setGrid(j);
   };
 
-  useEffect(() => { load(); }, [endDate]);
+  useEffect(() => { load(); }, [endDate, viewDays]);
 
   const sorted = useMemo(() => {
     if (!grid) return [] as GridDriver[];
@@ -64,6 +65,11 @@ export default function Hos607Page() {
           <input type="file" accept=".csv" onChange={e => { const f = e.target.files?.[0]; if (f) uploadTimecard(f); }} />
         </label>
         {uploading && <span>Uploading…</span>}
+        <label>View days:
+          <select className="input" value={viewDays} onChange={e => setViewDays(Number(e.target.value))}>
+            {[7,14,21,28,35,42].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </label>
         <a href="/hos-rules" className="link">View tracked HOS & compliance rules</a>
       </div>
 
@@ -71,20 +77,19 @@ export default function Hos607Page() {
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ position: 'sticky', left: 0, backgroundColor: 'var(--gray-light)', zIndex: 1 }}>Driver (Position ID)</th>
-              {grid && (grid.days && grid.days.length === 7 ? grid.days : Array.from({ length: 7 }).map((_, i) => ({ label: i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`, mmdd: '' }))).map((d, i) => (
-                <th key={i}>
+              <th style={{ position: 'sticky', top: 0, left: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>Driver (Position ID)</th>
+              {grid && (grid.days && grid.days.length ? grid.days : Array.from({ length: 7 }).map((_, i) => ({ label: i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`, mmdd: '' }))).map((d, i) => (
+                <th key={i} style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 1 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
                     <span>{d.label}</span>
                     <small style={{ color: '#666' }}>{d.mmdd || ''}</small>
                   </div>
                 </th>
               ))}
-              <th>Lunch</th>
-              <th>Status</th>
-              <th>7d Total</th>
-              <th>Used</th>
-              <th>Available</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>Status</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>7d Total</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>Used</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>Available</th>
             </tr>
           </thead>
           <tbody>
@@ -109,7 +114,7 @@ export default function Hos607Page() {
                     )}
                   </td>
                 ))}
-                <td>{d.lunch_total_minutes ? `${Math.round(d.lunch_total_minutes)}m` : '–'}</td>
+                {/* Lunch column removed (backend still computes) */}
                 <td>
                   {d.status ? (
                     <span className={`badge ${d.status === 'VIOLATION' ? 'badge-danger' : d.status === 'AT_RISK' ? 'badge-warning' : 'badge-success'}`} title={d.detail || ''}>
@@ -125,7 +130,7 @@ export default function Hos607Page() {
               </tr>
               {openRow === d.driver_id && (
                 <tr>
-                  <td colSpan={11}>
+                  <td colSpan={10}>
                     <div className="card" style={{ marginTop: '0.5rem', padding: '0.75rem' }}>
                       <div style={{ display: 'grid', gap: '0.75rem' }}>
                         <div>
@@ -176,7 +181,7 @@ export default function Hos607Page() {
             ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={11} style={{ textAlign: 'center', color: '#777', padding: '1rem' }}>No data for this window yet. Upload Timecard Report.csv to populate.</td>
+                <td colSpan={10} style={{ textAlign: 'center', color: '#777', padding: '1rem' }}>No data for this window yet. Upload Timecard Report.csv to populate.</td>
               </tr>
             )}
           </tbody>
