@@ -693,9 +693,16 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
 app.get('/api/hos/grid', async (req, res) => {
   const endDate = req.query.end || DateTime.now().toISODate();
   const end = DateTime.fromISO(String(endDate), { zone: 'utc' }).endOf('day');
+  const endLocal = DateTime.fromISO(String(endDate), { zone: 'America/Los_Angeles' }).endOf('day');
   const start = end.minus({ days: 6 }).startOf('day');
   const client = await pool.connect();
   try {
+    // Build day labels and dates in America/Los_Angeles to align with the grid
+    const days = Array.from({ length: 7 }).map((_, i) => {
+      const dayLocal = endLocal.minus({ days: 6 - i });
+      const label = i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6 - i}`;
+      return { label, iso: dayLocal.toISODate(), mmdd: dayLocal.toFormat('MM/dd') };
+    });
     // load distinct drivers that have segments in window
     const { rows: drivers } = await client.query(
       `SELECT DISTINCT d.driver_id, d.driver_name
@@ -953,7 +960,7 @@ app.get('/api/hos/grid', async (req, res) => {
       out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail, reasons: window_reasons, window_reasons, day_reasons });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
-    res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });
+    res.json({ window: { start: start.toISODate(), end: end.toISODate() }, days, drivers: out });
   } catch (e) { console.error(e); res.status(500).json({ error: 'grid_failed', detail: String(e) }); }
   finally { client.release(); }
 });

@@ -16,7 +16,7 @@ type GridDriver = {
 };
 
 export default function Hos607Page() {
-  const [grid, setGrid] = useState<{ window: { start: string; end: string }, drivers: GridDriver[] } | null>(null);
+  const [grid, setGrid] = useState<{ window: { start: string; end: string }, days?: { label: string; iso: string; mmdd: string }[], drivers: GridDriver[] } | null>(null);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [uploading, setUploading] = useState(false);
   const [openRow, setOpenRow] = useState<string | null>(null);
@@ -71,8 +71,13 @@ export default function Hos607Page() {
           <thead>
             <tr>
               <th style={{ position: 'sticky', left: 0, backgroundColor: 'var(--gray-light)', zIndex: 1 }}>Driver (Position ID)</th>
-              {grid && Array.from({ length: 7 }).map((_, i) => (
-                <th key={i}>{i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`}</th>
+              {grid && (grid.days && grid.days.length === 7 ? grid.days : Array.from({ length: 7 }).map((_, i) => ({ label: i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`, mmdd: '' }))).map((d, i) => (
+                <th key={i}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
+                    <span>{d.label}</span>
+                    <small style={{ color: '#666' }}>{d.mmdd || ''}</small>
+                  </div>
+                </th>
               ))}
               <th>Lunch</th>
               <th>Status</th>
@@ -143,7 +148,13 @@ export default function Hos607Page() {
                               })
                               .map(([day, list]) => (
                                 <div key={day}>
-                                  <div style={{ fontWeight: 600 }}>{day}</div>
+                                  <div style={{ fontWeight: 600 }}>{day}
+                                    {grid?.days ? (
+                                      <small style={{ marginLeft: 8, color: '#666' }}>
+                                        {grid.days[(day === 'D-6') ? 0 : (day === 'D-5') ? 1 : (day === 'D-4') ? 2 : (day === 'D-3') ? 3 : (day === 'D-2') ? 4 : (day === 'D-1') ? 5 : 6]?.mmdd || ''}
+                                      </small>
+                                    ) : null}
+                                  </div>
                                   <ul>
                                     {list.length ? list.map((r, i) => (
                                       <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
