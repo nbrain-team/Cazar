@@ -940,8 +940,8 @@ app.get('/api/hos/grid', async (req, res) => {
             reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
           }
         }
-        // Short rest before day
-        if (restBefore > 0 && restBefore < min_rest_hours_between_shifts) {
+        // Short rest before day (only matters if there is a worked shift on this day)
+        if (workedFlags[i] && restBefore > 0 && restBefore < min_rest_hours_between_shifts) {
           reasonsForDay.push({ type: 'REST', severity: 'VIOLATION', message: `Short rest before shift (${restBefore.toFixed(2)}h < ${min_rest_hours_between_shifts}h)`, values: { rest_before_hours: restBefore } });
         }
         // 5th/6th day exposure
