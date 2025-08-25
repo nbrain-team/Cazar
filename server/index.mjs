@@ -918,9 +918,8 @@ app.get('/api/hos/grid', async (req, res) => {
       );
       const dayRows = perDay.rows || [];
       const day_reasons = {};
-      const hours_threshold_work = 0.1; // treat < 0.1h as off-day
-      // Compute consecutive days exposure based on displayed day_hours to avoid drift
-      const workedFlags = day_hours.map(h => Number(h || 0) >= hours_threshold_work);
+      // Determine worked vs off strictly from rounded day_hours used in UI
+      const workedFlags = day_hours.map(h => Number(h || 0) > 0);
       let consec = 0;
       for (let i = 0; i < dayRows.length; i++) {
         const label = i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6 - i}`;
