@@ -64,6 +64,7 @@ export default function Hos607Page() {
           <input type="file" accept=".csv" onChange={e => { const f = e.target.files?.[0]; if (f) uploadTimecard(f); }} />
         </label>
         {uploading && <span>Uploading…</span>}
+        <a href="/hos-rules" className="link">View tracked HOS & compliance rules</a>
       </div>
 
       <div className="card" style={{ overflowX: 'auto' }}>
