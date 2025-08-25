@@ -619,6 +619,8 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
         const outType = iOutType >= 0 ? String(row[iOutType] || '').trim() : '';
         if (outType.toUpperCase() === 'PTO') { skipped++; continue; }
         if (!posId || !inStr || !outStr) { skipped++; continue; }
+        // Skip rows where In time and Out time are identical (no duration)
+        if (inStr === outStr) { skipped++; continue; }
         const driverId = posId;
         const fullName = `${fName} ${lName}`.trim();
         await client.query('SAVEPOINT sp_row');
@@ -639,6 +641,7 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
         let end = DateTime.invalid('init');
         for (const fmt of tryFormats) { end = DateTime.fromFormat(outStr, fmt, { zone: tz }); if (end.isValid) break; }
         if (!start.isValid || !end.isValid) { await client.query('ROLLBACK TO SAVEPOINT sp_row'); skipped++; continue; }
+        if (start.equals(end)) { await client.query('ROLLBACK TO SAVEPOINT sp_row'); skipped++; continue; }
         const startUtc = start.toUTC();
         const endAdj = end <= start ? end.plus({ days: 1 }) : end;
         const endUtc = endAdj.toUTC();

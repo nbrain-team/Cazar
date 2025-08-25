@@ -73,23 +73,23 @@ export default function Hos607Page() {
         <a href="/hos-rules" className="link">View tracked HOS & compliance rules</a>
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
-        <table className="data-table">
+      <div className="card" style={{ overflow: 'auto', maxHeight: '70vh' }}>
+        <table className="data-table" style={{ borderCollapse: 'separate' }}>
           <thead>
             <tr>
-              <th style={{ position: 'sticky', top: 0, left: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>Driver (Position ID)</th>
+              <th style={{ position: 'sticky', top: 0, left: 0, backgroundColor: 'var(--gray-light)', zIndex: 3 }}>Driver (Position ID)</th>
               {grid && (grid.days && grid.days.length ? grid.days : Array.from({ length: 7 }).map((_, i) => ({ label: i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`, mmdd: '' }))).map((d, i) => (
-                <th key={i} style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 1 }}>
+                <th key={i} style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
                     <span>{d.label}</span>
                     <small style={{ color: '#666' }}>{d.mmdd || ''}</small>
                   </div>
                 </th>
               ))}
-              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>Status</th>
-              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>7d Total</th>
-              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>Used</th>
-              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)' }}>Available</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>Status</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>7d Total</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>Used</th>
+              <th style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-light)', zIndex: 2 }}>Available</th>
             </tr>
           </thead>
           <tbody>
@@ -114,7 +114,7 @@ export default function Hos607Page() {
                     )}
                   </td>
                 ))}
-                {/* Lunch column removed (backend still computes) */}
+                {/* Lunch column removed */}
                 <td>
                   {d.status ? (
                     <span className={`badge ${d.status === 'VIOLATION' ? 'badge-danger' : d.status === 'AT_RISK' ? 'badge-warning' : 'badge-success'}`} title={d.detail || ''}>
@@ -130,7 +130,7 @@ export default function Hos607Page() {
               </tr>
               {openRow === d.driver_id && (
                 <tr>
-                  <td colSpan={10}>
+                  <td colSpan={(grid?.days && grid.days.length ? grid.days.length : 7) + 5}>
                     <div className="card" style={{ marginTop: '0.5rem', padding: '0.75rem' }}>
                       <div style={{ display: 'grid', gap: '0.75rem' }}>
                         <div>
