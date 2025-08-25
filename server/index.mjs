@@ -911,16 +911,18 @@ app.get('/api/hos/grid', async (req, res) => {
       );
       const dayRows = perDay.rows || [];
       const day_reasons = {};
-      // Compute consecutive days exposure
-      const workedFlags = dayRows.map(r => Number(r.on_hours || 0) > 0);
+      const hours_threshold_work = 0.1; // treat < 0.1h as off-day
+      // Compute consecutive days exposure based on displayed day_hours to avoid drift
+      const workedFlags = day_hours.map(h => Number(h || 0) >= hours_threshold_work);
       let consec = 0;
-      for (let i = 0; i < workedFlags.length; i++) {
-        consec = workedFlags[i] ? consec + 1 : 0;
+      for (let i = 0; i < dayRows.length; i++) {
+        const label = i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6 - i}`;
         const r = dayRows[i];
         const reasonsForDay = [];
-        const onh = Number(r.on_hours || 0);
+        const onh = Number(day_hours[i] || 0);
         const restBefore = Number(r.rest_before_hours || 0);
-        // Daily max
+        consec = workedFlags[i] ? consec + 1 : 0;
+        // Daily max based on the same number shown in the grid
         if (onh > daily_max_hours) {
           reasonsForDay.push({ type: 'DAILY_MAX', severity: 'VIOLATION', message: `Daily max exceeded (${onh.toFixed(2)}h > ${daily_max_hours}h)`, values: { on_hours: onh } });
         }
@@ -944,7 +946,7 @@ app.get('/api/hos/grid', async (req, res) => {
             reasonsForDay.push({ type: 'CONSECUTIVE_DAYS', severity: 'VIOLATION', message: `${consec}th consecutive work day`, values: { consecutive_days: consec } });
           }
         }
-        day_reasons[r.day] = reasonsForDay;
+        day_reasons[label] = reasonsForDay;
       }
       detail = window_reasons.map(r => r.message).join('; ');
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));

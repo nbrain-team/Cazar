@@ -136,18 +136,23 @@ export default function Hos607Page() {
                         <div>
                           <strong>Per-day reasoning</strong>
                           <div style={{ display: 'grid', gap: '0.5rem' }}>
-                            {d.day_reasons ? Object.entries(d.day_reasons).map(([day, list]) => (
-                              <div key={day}>
-                                <div style={{ fontWeight: 600 }}>{day}</div>
-                                <ul>
-                                  {list.length ? list.map((r, i) => (
-                                    <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
-                                      {r.message}
-                                    </li>
-                                  )) : <li>No issues</li>}
-                                </ul>
-                              </div>
-                            )) : <div>No day-level data</div>}
+                            {d.day_reasons ? Object.entries(d.day_reasons)
+                              .sort((a, b) => {
+                                const order = (k: string) => k === 'D-6' ? 0 : k === 'D-5' ? 1 : k === 'D-4' ? 2 : k === 'D-3' ? 3 : k === 'D-2' ? 4 : k === 'D-1' ? 5 : 6;
+                                return order(a[0]) - order(b[0]);
+                              })
+                              .map(([day, list]) => (
+                                <div key={day}>
+                                  <div style={{ fontWeight: 600 }}>{day}</div>
+                                  <ul>
+                                    {list.length ? list.map((r, i) => (
+                                      <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
+                                        {r.message}
+                                      </li>
+                                    )) : <li>No issues</li>}
+                                  </ul>
+                                </div>
+                              )) : <div>No day-level data</div>}
                           </div>
                         </div>
                       </div>
