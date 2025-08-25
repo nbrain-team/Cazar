@@ -10,12 +10,14 @@ type GridDriver = {
   lunch_total_minutes?: number; // aggregated lunch minutes across the window
   status?: 'OK' | 'AT_RISK' | 'VIOLATION';
   detail?: string;
+  reasons?: { type: string; severity: string; message: string; values?: Record<string, unknown> }[];
 };
 
 export default function Hos607Page() {
   const [grid, setGrid] = useState<{ window: { start: string; end: string }, drivers: GridDriver[] } | null>(null);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [uploading, setUploading] = useState(false);
+  const [openRow, setOpenRow] = useState<string | null>(null);
 
   const load = async () => {
     const r = await fetch(`/api/hos/grid?end=${endDate}`);
@@ -27,7 +29,15 @@ export default function Hos607Page() {
 
   const sorted = useMemo(() => {
     if (!grid) return [] as GridDriver[];
-    return [...grid.drivers].sort((a,b)=> a.hours_available - b.hours_available);
+    const rank = (s?: GridDriver['status']) => s === 'VIOLATION' ? 0 : s === 'AT_RISK' ? 1 : 2;
+    return [...grid.drivers].sort((a, b) => {
+      const ra = rank(a.status);
+      const rb = rank(b.status);
+      if (ra !== rb) return ra - rb;
+      const ha = Number(a.hours_available || 0);
+      const hb = Number(b.hours_available || 0);
+      return ha - hb;
+    });
   }, [grid]);
 
   const uploadTimecard = async (file: File) => {
@@ -71,7 +81,8 @@ export default function Hos607Page() {
           </thead>
           <tbody>
             {sorted.map(d => (
-              <tr key={d.driver_id}>
+              <>
+              <tr key={d.driver_id} onClick={() => setOpenRow(prev => prev === d.driver_id ? null : d.driver_id)} style={{ cursor: 'pointer' }}>
                 <td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--card-bg)', zIndex: 1 }}>{d.driver_name} ({d.driver_id})</td>
                 {d.day_hours.map((h, idx) => (
                   <td key={idx}>
@@ -104,6 +115,23 @@ export default function Hos607Page() {
                   {Number(d.hours_available || 0).toFixed(2)}h
                 </td>
               </tr>
+              {openRow === d.driver_id && (
+                <tr>
+                  <td colSpan={11}>
+                    <div className="card" style={{ marginTop: '0.5rem', padding: '0.75rem' }}>
+                      <strong>Reasons</strong>
+                      <ul style={{ marginTop: '0.5rem' }}>
+                        {(d.reasons && d.reasons.length) ? d.reasons.map((r, i) => (
+                          <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
+                            {r.message}
+                          </li>
+                        )) : <li>No current risks</li>}
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </>
             ))}
             {sorted.length === 0 && (
               <tr>

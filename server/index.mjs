@@ -825,13 +825,29 @@ app.get('/api/hos/grid', async (req, res) => {
       // Build status chip
       let status = 'OK';
       let detail = '';
-      if (hours_available < 0) { status = 'VIOLATION'; detail = 'Over 60/7 cap'; }
-      else if (hours_available < 2) { status = 'AT_RISK'; detail = 'Near 60/7 cap'; }
-      if (!meal_ok) { status = status === 'VIOLATION' ? status : 'AT_RISK'; detail = detail ? detail + '; Meal due' : 'Meal due'; }
-      if (rest_hours > 0 && rest_hours < min_rest_hours_between_shifts) { status = 'VIOLATION'; detail = detail ? detail + '; Short rest' : 'Short rest'; }
-      if (daily_hours > daily_max_hours) { status = 'VIOLATION'; detail = detail ? detail + '; Daily max exceeded' : 'Daily max exceeded'; }
+      const reasons = [];
+      if (hours_available < 0) {
+        status = 'VIOLATION';
+        reasons.push({ type: 'HOS_60_7', severity: 'VIOLATION', message: 'Exceeded 60/7 cap', values: { hours_used, hours_available } });
+      } else if (hours_available < 2) {
+        status = 'AT_RISK';
+        reasons.push({ type: 'HOS_60_7', severity: 'AT_RISK', message: 'Near 60/7 cap', values: { hours_used, hours_available } });
+      }
+      if (!meal_ok) {
+        if (status !== 'VIOLATION') status = 'AT_RISK';
+        reasons.push({ type: 'MEAL', severity: 'AT_RISK', message: `Meal break (${meal_min_minutes}m) due by ${meal_required_by_hour}h on-duty`, values: {} });
+      }
+      if (rest_hours > 0 && rest_hours < min_rest_hours_between_shifts) {
+        status = 'VIOLATION';
+        reasons.push({ type: 'REST', severity: 'VIOLATION', message: `Short rest (${rest_hours.toFixed(2)}h) < ${min_rest_hours_between_shifts}h`, values: { rest_hours } });
+      }
+      if (daily_hours > daily_max_hours) {
+        status = 'VIOLATION';
+        reasons.push({ type: 'DAILY_MAX', severity: 'VIOLATION', message: `Daily max exceeded (${daily_hours.toFixed(2)}h > ${daily_max_hours}h)`, values: { daily_hours } });
+      }
+      detail = reasons.map(r => r.message).join('; ');
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail });
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail, reasons });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });
