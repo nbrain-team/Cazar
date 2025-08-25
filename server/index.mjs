@@ -766,14 +766,25 @@ app.get('/api/hos/grid', async (req, res) => {
       );
       const day_hours = dailyRes.rows.map(r => Number(Number(r.hours).toFixed(2)));
       const lunch_total_minutes = Number(Number(lunchTotalRes.rows?.[0]?.minutes || 0).toFixed(0));
-      const hours_used = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
-      const hours_available = Number((60 - hours_used).toFixed(2));
+      const hours_used_base = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
+      // Include driver-attested other employer minutes over last 7 days
+      const attestRow = await client.query(
+        `SELECT other_employer_minutes_last7d
+           FROM driver_attestations
+          WHERE driver_id=$1 AND effective_utc <= $2
+          ORDER BY effective_utc DESC
+          LIMIT 1`,
+        [d.driver_id, wend]
+      );
+      const other_minutes = Number(attestRow.rows?.[0]?.other_employer_minutes_last7d || 0);
+      const hours_used = Number((hours_used_base + (other_minutes / 60.0)).toFixed(2));
+      let hours_available = Number((60 - hours_used).toFixed(2));
       // Policy thresholds (could be pulled from work_hours_policy_profiles)
       const meal_required_by_hour = 6; // require meal by 6th on-duty hour
       const meal_min_minutes = 30;    // 30-min minimum
       const min_rest_hours_between_shifts = 10; // short rest threshold
       const daily_max_hours = 12;     // daily max on-duty threshold
-      // Evaluate meal in window: within the last day, look for any break >= 30m occurring by 6th hour of on-duty
+      // Evaluate meal in window (most recent local day): look for any break >= 30m occurring by 6th hour of on-duty
       const mealOkRow = await client.query(
         `WITH day_bounds AS (
            SELECT date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles' AS s,
@@ -822,32 +833,122 @@ app.get('/api/hos/grid', async (req, res) => {
         [d.driver_id, end.toISO()]
       );
       const daily_hours = Number(dailyRow.rows?.[0]?.daily_hours || 0);
-      // Build status chip
+      // Build window-level status and reasons
       let status = 'OK';
       let detail = '';
-      const reasons = [];
+      const window_reasons = [];
       if (hours_available < 0) {
         status = 'VIOLATION';
-        reasons.push({ type: 'HOS_60_7', severity: 'VIOLATION', message: 'Exceeded 60/7 cap', values: { hours_used, hours_available } });
+        window_reasons.push({ type: 'HOS_60_7', severity: 'VIOLATION', message: 'Exceeded 60/7 cap', values: { hours_used, hours_available, other_minutes } });
       } else if (hours_available < 2) {
         status = 'AT_RISK';
-        reasons.push({ type: 'HOS_60_7', severity: 'AT_RISK', message: 'Near 60/7 cap', values: { hours_used, hours_available } });
+        window_reasons.push({ type: 'HOS_60_7', severity: 'AT_RISK', message: 'Near 60/7 cap', values: { hours_used, hours_available, other_minutes } });
       }
       if (!meal_ok) {
         if (status !== 'VIOLATION') status = 'AT_RISK';
-        reasons.push({ type: 'MEAL', severity: 'AT_RISK', message: `Meal break (${meal_min_minutes}m) due by ${meal_required_by_hour}h on-duty`, values: {} });
+        window_reasons.push({ type: 'MEAL', severity: 'AT_RISK', message: `Meal break (${meal_min_minutes}m) due by ${meal_required_by_hour}h on-duty`, values: {}, recommended_action: 'Prompt meal before 6th hour; adjust route timing' });
       }
       if (rest_hours > 0 && rest_hours < min_rest_hours_between_shifts) {
         status = 'VIOLATION';
-        reasons.push({ type: 'REST', severity: 'VIOLATION', message: `Short rest (${rest_hours.toFixed(2)}h) < ${min_rest_hours_between_shifts}h`, values: { rest_hours } });
+        window_reasons.push({ type: 'REST', severity: 'VIOLATION', message: `Short rest (${rest_hours.toFixed(2)}h) < ${min_rest_hours_between_shifts}h`, values: { rest_hours }, recommended_action: 'Reassign or delay start to ensure 10h rest' });
       }
       if (daily_hours > daily_max_hours) {
         status = 'VIOLATION';
-        reasons.push({ type: 'DAILY_MAX', severity: 'VIOLATION', message: `Daily max exceeded (${daily_hours.toFixed(2)}h > ${daily_max_hours}h)`, values: { daily_hours } });
+        window_reasons.push({ type: 'DAILY_MAX', severity: 'VIOLATION', message: `Daily max exceeded (${daily_hours.toFixed(2)}h > ${daily_max_hours}h)`, values: { daily_hours }, recommended_action: 'Early end or split assignment to keep ≤ 12h' });
       }
-      detail = reasons.map(r => r.message).join('; ');
+      // Per-day detailed reasons across the 7-day view
+      const perDay = await client.query(
+        `WITH w AS (
+             SELECT $1::timestamptz AS wstart, $2::timestamptz AS wend
+           ),
+           days_local AS (
+             SELECT generate_series(date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))) - interval '6 days',
+                                     date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
+                                     interval '1 day') AS day_local
+           ),
+           bounds AS (
+             SELECT day_local,
+                    (day_local AT TIME ZONE 'America/Los_Angeles') AS day_start_utc,
+                    ((day_local + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS day_end_utc
+               FROM days_local
+           ),
+           onday AS (
+             SELECT b.day_start_utc, b.day_end_utc,
+                    COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(s.end_utc, b.day_end_utc) - GREATEST(s.start_utc, b.day_start_utc)))/3600.0),0) AS on_hours,
+                    MIN(CASE WHEN s.end_utc > b.day_start_utc AND s.start_utc < b.day_end_utc THEN GREATEST(s.start_utc, b.day_start_utc) END) AS first_start_utc,
+                    MAX(CASE WHEN s.end_utc > b.day_start_utc AND s.start_utc < b.day_end_utc THEN LEAST(s.end_utc, b.day_end_utc) END) AS last_end_utc
+               FROM bounds b
+               LEFT JOIN on_duty_segments s ON s.driver_id=$3 AND s.end_utc > b.day_start_utc AND s.start_utc < b.day_end_utc
+              GROUP BY b.day_start_utc, b.day_end_utc
+           ),
+           brks AS (
+             SELECT b.day_start_utc, b.day_end_utc,
+                    COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0),0) AS break_minutes,
+                    COALESCE(MAX(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS qual_meal_exists,
+                    MIN(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN br.start_utc END) AS earliest_qual_meal_start
+               FROM bounds b
+               LEFT JOIN break_segments br ON br.driver_id=$3 AND br.end_utc > b.day_start_utc AND br.start_utc < b.day_end_utc
+              GROUP BY b.day_start_utc, b.day_end_utc
+           ),
+           combined AS (
+             SELECT b.day_start_utc, b.day_end_utc, od.on_hours, od.first_start_utc, od.last_end_utc,
+                    br.break_minutes, br.qual_meal_exists, br.earliest_qual_meal_start
+               FROM bounds b
+               LEFT JOIN onday od ON od.day_start_utc=b.day_start_utc AND od.day_end_utc=b.day_end_utc
+               LEFT JOIN brks br ON br.day_start_utc=b.day_start_utc AND br.day_end_utc=b.day_end_utc
+           )
+           SELECT to_char(day_start_utc, 'YYYY-MM-DD') AS day,
+                  on_hours,
+                  first_start_utc,
+                  last_end_utc,
+                  break_minutes,
+                  qual_meal_exists,
+                  earliest_qual_meal_start,
+                  EXTRACT(EPOCH FROM (first_start_utc - LAG(last_end_utc) OVER (ORDER BY day_start_utc)))/3600.0 AS rest_before_hours
+             FROM combined
+            ORDER BY day_start_utc;`,
+        [wstart, wend, d.driver_id, meal_min_minutes]
+      );
+      const dayRows = perDay.rows || [];
+      const day_reasons = {};
+      // Compute consecutive days exposure
+      const workedFlags = dayRows.map(r => Number(r.on_hours || 0) > 0);
+      let consec = 0;
+      for (let i = 0; i < workedFlags.length; i++) {
+        consec = workedFlags[i] ? consec + 1 : 0;
+        const r = dayRows[i];
+        const reasonsForDay = [];
+        const onh = Number(r.on_hours || 0);
+        const restBefore = Number(r.rest_before_hours || 0);
+        // Daily max
+        if (onh > daily_max_hours) {
+          reasonsForDay.push({ type: 'DAILY_MAX', severity: 'VIOLATION', message: `Daily max exceeded (${onh.toFixed(2)}h > ${daily_max_hours}h)`, values: { on_hours: onh } });
+        }
+        // Meal by 6th hour: require qualifying meal before or at first_start + 6h
+        if (onh >= meal_required_by_hour) {
+          const firstStart = r.first_start_utc ? DateTime.fromISO(String(r.first_start_utc)) : null;
+          const earliestQual = r.earliest_qual_meal_start ? DateTime.fromISO(String(r.earliest_qual_meal_start)) : null;
+          if (!earliestQual || !firstStart || earliestQual > firstStart.plus({ hours: meal_required_by_hour })) {
+            reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+          }
+        }
+        // Short rest before day
+        if (restBefore > 0 && restBefore < min_rest_hours_between_shifts) {
+          reasonsForDay.push({ type: 'REST', severity: 'VIOLATION', message: `Short rest before shift (${restBefore.toFixed(2)}h < ${min_rest_hours_between_shifts}h)`, values: { rest_before_hours: restBefore } });
+        }
+        // 5th/6th day exposure
+        if (workedFlags[i]) {
+          if (consec === 5) {
+            reasonsForDay.push({ type: 'CONSECUTIVE_DAYS', severity: 'AT_RISK', message: '5th consecutive work day exposure', values: { consecutive_days: consec } });
+          } else if (consec >= 6) {
+            reasonsForDay.push({ type: 'CONSECUTIVE_DAYS', severity: 'VIOLATION', message: `${consec}th consecutive work day`, values: { consecutive_days: consec } });
+          }
+        }
+        day_reasons[r.day] = reasonsForDay;
+      }
+      detail = window_reasons.map(r => r.message).join('; ');
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail, reasons });
+      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail, reasons: window_reasons, window_reasons, day_reasons });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, drivers: out });

@@ -11,6 +11,8 @@ type GridDriver = {
   status?: 'OK' | 'AT_RISK' | 'VIOLATION';
   detail?: string;
   reasons?: { type: string; severity: string; message: string; values?: Record<string, unknown> }[];
+  window_reasons?: { type: string; severity: string; message: string; recommended_action?: string; values?: Record<string, unknown> }[];
+  day_reasons?: Record<string, { type: string; severity: string; message: string; values?: Record<string, unknown> }[]>;
 };
 
 export default function Hos607Page() {
@@ -119,14 +121,36 @@ export default function Hos607Page() {
                 <tr>
                   <td colSpan={11}>
                     <div className="card" style={{ marginTop: '0.5rem', padding: '0.75rem' }}>
-                      <strong>Reasons</strong>
-                      <ul style={{ marginTop: '0.5rem' }}>
-                        {(d.reasons && d.reasons.length) ? d.reasons.map((r, i) => (
-                          <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
-                            {r.message}
-                          </li>
-                        )) : <li>No current risks</li>}
-                      </ul>
+                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        <div>
+                          <strong>Window reasoning (last 7 days)</strong>
+                          <ul style={{ marginTop: '0.5rem' }}>
+                            {(d.window_reasons && d.window_reasons.length) ? d.window_reasons.map((r, i) => (
+                              <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
+                                {r.message}
+                                {r.recommended_action ? <em style={{ marginLeft: 8, color: '#666' }}>— {r.recommended_action}</em> : null}
+                              </li>
+                            )) : <li>No window risks</li>}
+                          </ul>
+                        </div>
+                        <div>
+                          <strong>Per-day reasoning</strong>
+                          <div style={{ display: 'grid', gap: '0.5rem' }}>
+                            {d.day_reasons ? Object.entries(d.day_reasons).map(([day, list]) => (
+                              <div key={day}>
+                                <div style={{ fontWeight: 600 }}>{day}</div>
+                                <ul>
+                                  {list.length ? list.map((r, i) => (
+                                    <li key={i} style={{ color: r.severity === 'VIOLATION' ? 'var(--danger)' : r.severity === 'AT_RISK' ? 'var(--warning)' : 'inherit' }}>
+                                      {r.message}
+                                    </li>
+                                  )) : <li>No issues</li>}
+                                </ul>
+                              </div>
+                            )) : <div>No day-level data</div>}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </td>
                 </tr>
