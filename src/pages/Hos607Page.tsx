@@ -73,9 +73,9 @@ export default function Hos607Page() {
         <a href="/hos-rules" className="link">View tracked HOS & compliance rules</a>
       </div>
 
-      <div className="card" style={{ overflow: 'auto', maxHeight: '70vh' }}>
+      <div className="card" style={{ overflowX: 'auto' }}>
         <table className="data-table" style={{ borderCollapse: 'separate' }}>
-          <thead>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--gray-light)' }}>
             <tr>
               <th style={{ position: 'sticky', top: 0, left: 0, backgroundColor: 'var(--gray-light)', zIndex: 3 }}>Driver (Position ID)</th>
               {grid && (grid.days && grid.days.length ? grid.days : Array.from({ length: 7 }).map((_, i) => ({ label: i === 0 ? 'D-6' : i === 6 ? 'D' : `D-${6-i}`, mmdd: '' }))).map((d, i) => (

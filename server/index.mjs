@@ -675,6 +675,33 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
             }
             break;
           }
+        } else {
+          // If not explicitly LP: infer lunch when a same-day gap of 30-60 minutes exists to the next row for this driver
+          for (let j = li + 1; j < records.length; j++) {
+            const next = records[j];
+            if (!next || !next.length) continue;
+            const nextPos = String(next[iPos] || '').trim();
+            const nextIn = String(next[iIn] || '').trim();
+            if (nextPos !== posId) continue;
+            let nextStart = DateTime.invalid('init');
+            for (const fmt of tryFormats) { nextStart = DateTime.fromFormat(nextIn, fmt, { zone: tz }); if (nextStart.isValid) break; }
+            if (!nextStart.isValid) break;
+            // Only if within the same local calendar day
+            if (nextStart.startOf('day').toISO() !== end.toLocal().startOf('day').toISO()) break;
+            const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
+            if (gapMin >= 30 && gapMin <= 60) {
+              const infStartUtc = endUtc;
+              const infEndUtc = nextStart.toUTC();
+              if (infEndUtc > infStartUtc) {
+                await client.query(
+                  `INSERT INTO break_segments (driver_id, upload_id, label, start_utc, end_utc, source_row_ref)
+                   VALUES ($1, $2, 'Lunch (inferred)', $3, $4, $5)`,
+                  [driverId, uploadId, infStartUtc.toISO(), infEndUtc.toISO(), JSON.stringify({ inferred: true, reason: 'gap_between_segments', from_line: li, to_line: j, gap_minutes: gapMin })]
+                );
+              }
+            }
+            break;
+          }
         }
           segs++; rowsIngested++;
         } catch (rowErr) {
@@ -906,14 +933,15 @@ app.get('/api/hos/grid', async (req, res) => {
              SELECT b.day_start_utc, b.day_end_utc,
                     COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0),0) AS break_minutes,
                     COALESCE(MAX(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS qual_meal_exists,
-                    MIN(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN br.start_utc END) AS earliest_qual_meal_start
+                    MIN(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN br.start_utc END) AS earliest_qual_meal_start,
+                    COALESCE(MAX(CASE WHEN (br.source_row_ref ->> 'inferred') = 'true' AND EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS inferred_meal_exists
                FROM bounds b
                LEFT JOIN break_segments br ON br.driver_id=$3 AND br.end_utc > b.day_start_utc AND br.start_utc < b.day_end_utc
               GROUP BY b.day_start_utc, b.day_end_utc
            ),
            combined AS (
              SELECT b.day_start_utc, b.day_end_utc, od.on_hours, od.first_start_utc, od.last_end_utc,
-                    br.break_minutes, br.qual_meal_exists, br.earliest_qual_meal_start
+                    br.break_minutes, br.qual_meal_exists, br.earliest_qual_meal_start, br.inferred_meal_exists
                FROM bounds b
                LEFT JOIN onday od ON od.day_start_utc=b.day_start_utc AND od.day_end_utc=b.day_end_utc
                LEFT JOIN brks br ON br.day_start_utc=b.day_start_utc AND br.day_end_utc=b.day_end_utc
@@ -925,6 +953,7 @@ app.get('/api/hos/grid', async (req, res) => {
                   break_minutes,
                   qual_meal_exists,
                   earliest_qual_meal_start,
+                  inferred_meal_exists,
                   EXTRACT(EPOCH FROM (first_start_utc - LAG(last_end_utc) OVER (ORDER BY day_start_utc)))/3600.0 AS rest_before_hours
              FROM combined
             ORDER BY day_start_utc;`,
@@ -952,6 +981,10 @@ app.get('/api/hos/grid', async (req, res) => {
           const earliestQual = r.earliest_qual_meal_start ? DateTime.fromISO(String(r.earliest_qual_meal_start)) : null;
           if (!earliestQual || !firstStart || earliestQual > firstStart.plus({ hours: meal_required_by_hour })) {
             reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+          }
+          // If a qualifying meal exists but was inferred (not LP), add a NOTICE for manager follow-up
+          if (Number(r.qual_meal_exists || 0) === 1 && Number(r.inferred_meal_exists || 0) === 1) {
+            reasonsForDay.push({ type: 'MEAL_INFERRED', severity: 'NOTICE', message: 'Lunch appears taken (gap 30–60m) but not logged as LP', values: {} });
           }
         }
         // Short rest before day (only matters if there is a worked shift on this day)
