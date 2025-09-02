@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Download, Calendar, Clock, CheckCircle, 
+  FileText, Download, CheckCircle, 
   AlertTriangle, Printer, Mail, Shield, Award,
-  TrendingUp, Users, BarChart
+  Users, BarChart
 } from 'lucide-react';
-import { DatabaseService } from '../services/database';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
@@ -178,7 +177,7 @@ export const HOSComplianceReports: React.FC = () => {
       }
       
       // Footer on each page
-      const totalPages = pdf.internal.getNumberOfPages();
+      const totalPages = (pdf as any).internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
         pdf.setFontSize(8);
@@ -212,9 +211,9 @@ export const HOSComplianceReports: React.FC = () => {
     
     // Executive Summary
     pdf.setFontSize(14);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont(pdf.getFont().fontName, 'bold');
     pdf.text('Executive Summary', 20, y);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont(pdf.getFont().fontName, 'normal');
     pdf.setFontSize(10);
     y += 10;
     
@@ -225,9 +224,9 @@ export const HOSComplianceReports: React.FC = () => {
     
     // Compliance Metrics Table
     pdf.setFontSize(12);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont(pdf.getFont().fontName, 'bold');
     pdf.text('Compliance Metrics', 20, y);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont(pdf.getFont().fontName, 'normal');
     y += 10;
     
     pdf.autoTable({
@@ -251,9 +250,9 @@ export const HOSComplianceReports: React.FC = () => {
     
     // Driver Summary
     pdf.setFontSize(12);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont(pdf.getFont().fontName, 'bold');
     pdf.text('Driver Compliance Summary', 20, y);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont(pdf.getFont().fontName, 'normal');
     y += 10;
     
     // Mock driver data
@@ -298,9 +297,9 @@ export const HOSComplianceReports: React.FC = () => {
     
     // Certification
     pdf.setFontSize(14);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont(pdf.getFont().fontName, 'bold');
     pdf.text('Compliance Certification', 20, y);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont(pdf.getFont().fontName, 'normal');
     pdf.setFontSize(10);
     y += 10;
     
@@ -354,9 +353,9 @@ export const HOSComplianceReports: React.FC = () => {
     let y = startY;
     
     pdf.setFontSize(14);
-    pdf.setFont(undefined, 'bold');
+    pdf.setFont(pdf.getFont().fontName, 'bold');
     pdf.text('Compliance Audit Trail', 20, y);
-    pdf.setFont(undefined, 'normal');
+    pdf.setFont(pdf.getFont().fontName, 'normal');
     y += 10;
     
     pdf.autoTable({

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+  LineChart, Line, PieChart, Pie, Cell, 
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  TrendingUp, AlertTriangle, DollarSign, Calendar, Users, 
-  Clock, Activity, FileText, Download, Filter 
+  TrendingUp, AlertTriangle, DollarSign, Users, 
+  Download 
 } from 'lucide-react';
 import { DatabaseService } from '../services/database';
 
@@ -51,7 +51,7 @@ const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4'
 
 export const HOSViolationAnalytics: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
-  const [selectedViolationType, setSelectedViolationType] = useState<string>('all');
+  const [selectedViolationType] = useState<string>('all');
   const [violationTrends, setViolationTrends] = useState<ViolationTrend[]>([]);
   const [violationsByType, setViolationsByType] = useState<ViolationByType[]>([]);
   const [driverStats, setDriverStats] = useState<DriverViolationStats[]>([]);
@@ -339,7 +339,7 @@ export const HOSViolationAnalytics: React.FC = () => {
                 fill="#8884d8"
                 dataKey="count"
               >
-                {violationsByType.map((entry, index) => (
+                {violationsByType.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

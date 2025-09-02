@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@radix-ui/react-tabs';
 import { Activity, MessageSquare, FileText, TrendingUp, Settings, Calendar } from 'lucide-react';
 import { HOSRealtimeDashboard } from '../components/HOSRealtimeDashboard';

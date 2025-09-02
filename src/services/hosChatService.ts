@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { DatabaseService } from './database';
-import type { Driver, Route, Timecard, Schedule } from '../types';
+import type { Driver, Timecard, Schedule } from '../types';
 
 // Import HOS rules and calculations (we'll create a TypeScript wrapper)
 interface HOSMetrics {
@@ -324,8 +324,9 @@ export class HOSChatService {
     for (const [key, regulation] of Object.entries(regulations)) {
       const searchKey = key.replace(/_/g, ' ');
       if (query.includes(searchKey) || query.includes(key)) {
+        const violationsOrBenefits = 'violations' in regulation ? regulation.violations : ('benefits' in regulation ? regulation.benefits : '');
         return {
-          answer: `${regulation.description}\n\nDetails: ${regulation.details}\n\nViolations: ${regulation.violations || regulation.benefits}`,
+          answer: `${regulation.description}\n\nDetails: ${regulation.details}\n\nViolations: ${violationsOrBenefits}`,
           suggestions: [
             "Show current violations of this rule",
             "Which drivers are close to this limit?",
@@ -356,10 +357,10 @@ export class HOSChatService {
   /**
    * Handle availability queries
    */
-  private static async handleAvailabilityQuery(query: string): Promise<any> {
+  private static async handleAvailabilityQuery(_query: string): Promise<any> {
     const drivers = await DatabaseService.getDrivers();
     const timecards = await DatabaseService.getTimecards();
-    const routes = await DatabaseService.getRoutes();
+    // const routes = await DatabaseService.getRoutes();
     
     const now = DateTime.now();
     const availableNow = [];
@@ -411,7 +412,7 @@ export class HOSChatService {
   /**
    * Handle prediction queries
    */
-  private static async handlePredictionQuery(query: string): Promise<any> {
+  private static async handlePredictionQuery(_query: string): Promise<any> {
     const drivers = await DatabaseService.getDrivers();
     const schedules = await DatabaseService.getSchedules();
     const timecards = await DatabaseService.getTimecards();
@@ -525,8 +526,8 @@ export class HOSChatService {
       
       // Add driving segment (simplified - in reality would check actual driving vs on-duty)
       segments.push({
-        startUtc: clockIn.toISO(),
-        endUtc: clockOut.toISO(),
+        startUtc: clockIn.toISO() || '',
+        endUtc: clockOut.toISO() || '',
         status: 'DRIVING',
         driverId: driverId,
       });
@@ -538,8 +539,8 @@ export class HOSChatService {
       
       if (nextTimecard) {
         segments.push({
-          startUtc: clockOut.toISO(),
-          endUtc: DateTime.fromISO(nextTimecard.clock_in_time).toISO(),
+          startUtc: clockOut.toISO() || '',
+          endUtc: DateTime.fromISO(nextTimecard.clock_in_time).toISO() || '',
           status: 'OFF_DUTY',
           driverId: driverId,
         });
@@ -687,7 +688,7 @@ export class HOSChatService {
    * Get available drivers for a specific date
    */
   private static async getAvailableDriversForDate(
-    date: DateTime,
+    _date: DateTime,
     drivers: Driver[],
     timecards: Timecard[]
   ) {

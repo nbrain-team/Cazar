@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, AlertTriangle, CheckCircle, TrendingUp, Users, ChevronRight, Shield } from 'lucide-react';
 import { DatabaseService } from '../services/database';
-import { HOSChatService } from '../services/hosChatService';
-import type { Driver, Schedule } from '../types';
 
 interface ScheduleSuggestion {
   driverId: string;
@@ -44,7 +42,7 @@ export const HOSSmartScheduler: React.FC = () => {
     try {
       const drivers = await DatabaseService.getDrivers();
       const schedules = await DatabaseService.getSchedules();
-      const timecards = await DatabaseService.getTimecards();
+      // const timecards = await DatabaseService.getTimecards();
 
       // Generate smart suggestions
       const newSuggestions: ScheduleSuggestion[] = [];

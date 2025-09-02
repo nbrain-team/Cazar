@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, AlertTriangle, CheckCircle, TrendingUp, Users, Activity, AlertCircle } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle, TrendingUp, AlertCircle } from 'lucide-react';
 import { DatabaseService } from '../services/database';
-import { HOSChatService } from '../services/hosChatService';
 import type { Driver } from '../types';
 
 interface DriverHOSStatus {
@@ -46,8 +45,8 @@ export const HOSRealtimeDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       const drivers = await DatabaseService.getDrivers();
-      const timecards = await DatabaseService.getTimecards();
-      const schedules = await DatabaseService.getSchedules();
+      // const timecards = await DatabaseService.getTimecards();
+      // const schedules = await DatabaseService.getSchedules();
       
       const statuses: DriverHOSStatus[] = [];
       let availableCount = 0;
