@@ -28,7 +28,8 @@ export default function HOSCompliancePage() {
         <p>Comprehensive Hours of Service management, violation prevention, and compliance tracking</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="hos-tabs">
+      <div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="hos-tabs">
         <TabsList className="hos-tabs-list">
             <TabsTrigger value="dashboard" className="hos-tab-trigger">
               <Activity />
