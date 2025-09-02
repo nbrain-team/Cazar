@@ -4,23 +4,11 @@ import { Activity, MessageSquare, FileText, TrendingUp, Settings, Calendar } fro
 import { HOSRealtimeDashboard } from '../components/HOSRealtimeDashboard';
 import { HOSChatPanel } from '../components/HOSChatPanel';
 import { HOSSmartScheduler } from '../components/HOSSmartScheduler';
+import { HOSViolationAnalytics } from '../components/HOSViolationAnalytics';
+import { HOSComplianceReports } from '../components/HOSComplianceReports';
 import Hos607Page from './Hos607Page';
 
-// Placeholder components for future features
-const ViolationAnalytics = () => (
-  <div className="p-6 bg-white rounded-lg shadow">
-    <h3 className="text-lg font-semibold mb-4">Violation Analytics</h3>
-    <p className="text-gray-600">Coming soon: Detailed violation patterns, cost analysis, and root cause insights.</p>
-  </div>
-);
-
-const ComplianceReports = () => (
-  <div className="p-6 bg-white rounded-lg shadow">
-    <h3 className="text-lg font-semibold mb-4">DOT Compliance Reports</h3>
-    <p className="text-gray-600">Coming soon: Generate DOT-ready reports, audit trails, and compliance documentation.</p>
-  </div>
-);
-
+// Placeholder component for settings
 const HOSSettings = () => (
   <div className="p-6 bg-white rounded-lg shadow">
     <h3 className="text-lg font-semibold mb-4">HOS Settings</h3>
@@ -180,11 +168,11 @@ export default function HOSCompliancePage() {
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-0">
-            <ViolationAnalytics />
+            <HOSViolationAnalytics />
           </TabsContent>
 
           <TabsContent value="reports" className="mt-0">
-            <ComplianceReports />
+            <HOSComplianceReports />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-0">

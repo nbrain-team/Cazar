@@ -1325,6 +1325,173 @@ app.get('/api/hos/fleet/dashboard', async (req, res) => {
   }
 });
 
+// GET /api/hos/violations/analytics - Violation analytics data
+app.get('/api/hos/violations/analytics', async (req, res) => {
+  const { startDate, endDate, groupBy = 'type' } = req.query;
+  const client = await pool.connect();
+  
+  try {
+    const start = startDate ? DateTime.fromISO(startDate) : DateTime.now().minus({ days: 30 });
+    const end = endDate ? DateTime.fromISO(endDate) : DateTime.now();
+    
+    // Get violation history from driver_violations table
+    const { rows: violations } = await client.query(
+      `SELECT 
+        dv.*,
+        d.driver_name,
+        dv.metric_key as violation_type,
+        dv.observed_value,
+        dv.threshold_value,
+        dv.occurred_at,
+        dv.severity
+       FROM driver_violations dv
+       JOIN drivers d ON d.driver_id = dv.transporter_id
+       WHERE dv.occurred_at BETWEEN $1 AND $2
+       ORDER BY dv.occurred_at DESC`,
+      [start.toISO(), end.toISO()]
+    );
+    
+    // Group violations by type
+    const violationsByType = violations.reduce((acc, v) => {
+      const type = v.violation_type || 'UNKNOWN';
+      if (!acc[type]) {
+        acc[type] = { count: 0, cost: 0, drivers: new Set() };
+      }
+      acc[type].count++;
+      acc[type].drivers.add(v.driver_name);
+      // Estimate costs based on violation type
+      const costMap = {
+        'WEEKLY_60_HOUR': 2750,
+        'DRIVING_11_HOUR': 2750,
+        'ON_DUTY_14_HOUR': 2750,
+        'BREAK_30_MINUTE': 1650,
+        'REST_10_HOUR': 2750,
+      };
+      acc[type].cost += costMap[type] || 1100;
+      return acc;
+    }, {});
+    
+    // Calculate trends
+    const dailyTrends = {};
+    violations.forEach(v => {
+      const date = DateTime.fromISO(v.occurred_at).toISODate();
+      if (!dailyTrends[date]) {
+        dailyTrends[date] = 0;
+      }
+      dailyTrends[date]++;
+    });
+    
+    res.json({
+      summary: {
+        totalViolations: violations.length,
+        totalEstimatedCost: Object.values(violationsByType).reduce((sum, v) => sum + v.cost, 0),
+        uniqueDrivers: new Set(violations.map(v => v.transporter_id)).size,
+        dateRange: { start: start.toISO(), end: end.toISO() }
+      },
+      violationsByType: Object.entries(violationsByType).map(([type, data]) => ({
+        type,
+        count: data.count,
+        estimatedCost: data.cost,
+        driversAffected: data.drivers.size
+      })),
+      trends: Object.entries(dailyTrends).map(([date, count]) => ({ date, count })),
+      topViolators: violations.slice(0, 10).map(v => ({
+        driverName: v.driver_name,
+        driverId: v.transporter_id,
+        violationType: v.violation_type,
+        occurredAt: v.occurred_at,
+        severity: v.severity
+      }))
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'analytics_failed', detail: String(e) });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/hos/report/generate - Generate compliance report
+app.post('/api/hos/report/generate', async (req, res) => {
+  const { reportType, startDate, endDate, format = 'json' } = req.body;
+  const client = await pool.connect();
+  
+  try {
+    const start = DateTime.fromISO(startDate);
+    const end = DateTime.fromISO(endDate);
+    
+    // Get all necessary data for the report
+    const { rows: drivers } = await client.query(
+      'SELECT * FROM drivers WHERE driver_status = $1 ORDER BY driver_name',
+      ['active']
+    );
+    
+    const reportData = {
+      metadata: {
+        reportType,
+        generatedAt: DateTime.now().toISO(),
+        period: { start: start.toISO(), end: end.toISO() },
+        company: 'Your Delivery Company',
+        dotNumber: '1234567'
+      },
+      drivers: [],
+      summary: {
+        totalDrivers: drivers.length,
+        compliantDrivers: 0,
+        totalViolations: 0,
+        estimatedFines: 0
+      }
+    };
+    
+    // Process each driver
+    for (const driver of drivers) {
+      const { rows: segments } = await client.query(
+        `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
+         FROM on_duty_segments 
+         WHERE driver_id = $1 AND start_utc >= $2 AND end_utc <= $3 
+         ORDER BY start_utc`,
+        [driver.driver_id, start.toISO(), end.toISO()]
+      );
+      
+      const { rows: violations } = await client.query(
+        `SELECT * FROM driver_violations 
+         WHERE transporter_id = $1 AND occurred_at BETWEEN $2 AND $3`,
+        [driver.driver_id, start.toISO(), end.toISO()]
+      );
+      
+      const driverData = {
+        driverId: driver.driver_id,
+        driverName: driver.driver_name,
+        totalHours: segments.reduce((sum, s) => {
+          const duration = DateTime.fromISO(s.end_utc).diff(DateTime.fromISO(s.start_utc), 'hours').hours;
+          return sum + duration;
+        }, 0),
+        violations: violations.length,
+        compliant: violations.length === 0,
+        segments: segments.length
+      };
+      
+      reportData.drivers.push(driverData);
+      if (driverData.compliant) reportData.summary.compliantDrivers++;
+      reportData.summary.totalViolations += violations.length;
+    }
+    
+    // Log audit entry
+    await client.query(
+      `INSERT INTO api_sync_log (api_source, sync_type, sync_status, records_synced, started_at, completed_at) 
+       VALUES ('hos_system', 'report_generated', 'success', $1, NOW(), NOW())`,
+      [reportData.drivers.length]
+    );
+    
+    res.json(reportData);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'report_generation_failed', detail: String(e) });
+  } finally {
+    client.release();
+  }
+});
+
 // Static hosting for built frontend
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
