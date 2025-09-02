@@ -687,7 +687,7 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
             for (const fmt of tryFormats) { nextStart = DateTime.fromFormat(nextIn, fmt, { zone: tz }); if (nextStart.isValid) break; }
             if (!nextStart.isValid) break;
             // Only if within the same local calendar day
-            if (nextStart.startOf('day').toISO() !== end.toLocal().startOf('day').toISO()) break;
+            if (!nextStart.hasSame(endAdj, 'day')) break;
             const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
             if (gapMin >= 30 && gapMin <= 60) {
               const infStartUtc = endUtc;
@@ -979,12 +979,16 @@ app.get('/api/hos/grid', async (req, res) => {
         if (onh >= meal_required_by_hour) {
           const firstStart = r.first_start_utc ? DateTime.fromISO(String(r.first_start_utc)) : null;
           const earliestQual = r.earliest_qual_meal_start ? DateTime.fromISO(String(r.earliest_qual_meal_start)) : null;
-          if (!earliestQual || !firstStart || earliestQual > firstStart.plus({ hours: meal_required_by_hour })) {
-            reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
-          }
-          // If a qualifying meal exists but was inferred (not LP), add a NOTICE for manager follow-up
-          if (Number(r.qual_meal_exists || 0) === 1 && Number(r.inferred_meal_exists || 0) === 1) {
-            reasonsForDay.push({ type: 'MEAL_INFERRED', severity: 'NOTICE', message: 'Lunch appears taken (gap 30–60m) but not logged as LP', values: {} });
+          const qual = Number(r.qual_meal_exists || 0) === 1;
+          const inferred = Number(r.inferred_meal_exists || 0) === 1;
+          const mealBy6Ok = !!(firstStart && earliestQual && earliestQual <= firstStart.plus({ hours: meal_required_by_hour }));
+          if (!qual || !mealBy6Ok) {
+            if (inferred) {
+              // Looks like lunch taken but mis-typed; classify as Driver Log Error, not a violation
+              reasonsForDay.push({ type: 'DRIVER_LOG_ERROR', severity: 'NOTICE', message: 'Lunch likely taken (gap 30–60m) but not logged as LP by 6h', values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+            } else {
+              reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+            }
           }
         }
         // Short rest before day (only matters if there is a worked shift on this day)
@@ -1055,6 +1059,270 @@ app.post('/api/whc/:driver/:date/note', async (req, res) => {
     await pool.query(`UPDATE work_hours_audit_daily SET reasons = COALESCE(reasons, ARRAY[]::text[]) || $1 WHERE work_date=$2 AND driver_name=$3`, [note, date, driver]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'note_failed' }); }
+});
+
+// =============================
+// Enhanced HOS API Endpoints
+// =============================
+
+// Import enhanced HOS module
+import { 
+  checkCompliance, 
+  calculateAvailableHours, 
+  projectViolation,
+  generateRecommendations,
+  DutySegment,
+  DUTY_STATUS 
+} from './lib/hosEnhanced.mjs';
+
+// GET /api/hos/chat - Process natural language queries about HOS
+app.post('/api/hos/chat', async (req, res) => {
+  const { query } = req.body;
+  if (!query) return res.status(400).json({ error: 'query_required' });
+  
+  const client = await pool.connect();
+  try {
+    const now = DateTime.utc();
+    const normalizedQuery = query.toLowerCase();
+    
+    // Analyze query type and respond accordingly
+    let response = { answer: '', data: null, suggestions: [] };
+    
+    if (normalizedQuery.includes('violation') || normalizedQuery.includes('compliant')) {
+      // Get current violations
+      const { rows: drivers } = await client.query('SELECT DISTINCT driver_id, driver_name FROM drivers WHERE driver_status = $1', ['active']);
+      const violations = [];
+      
+      for (const driver of drivers) {
+        const { rows: segments } = await client.query(
+          `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
+           FROM on_duty_segments 
+           WHERE driver_id = $1 AND end_utc > $2 
+           ORDER BY start_utc`,
+          [driver.driver_id, now.minus({ days: 8 }).toISO()]
+        );
+        
+        const dutySegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
+        const compliance = checkCompliance(dutySegments, now);
+        
+        if (!compliance.compliant) {
+          violations.push({
+            driver,
+            violations: compliance.violations
+          });
+        }
+      }
+      
+      response.answer = violations.length === 0 
+        ? 'All drivers are currently compliant with HOS regulations.'
+        : `Found ${violations.length} drivers with HOS violations.`;
+      response.data = violations;
+      response.suggestions = [
+        'Which drivers are available to work?',
+        'Who needs a break soon?',
+        'Predict violations for tomorrow'
+      ];
+    } else if (normalizedQuery.includes('available') || normalizedQuery.includes('can work')) {
+      // Get available drivers
+      const { rows: drivers } = await client.query('SELECT driver_id, driver_name FROM drivers WHERE driver_status = $1', ['active']);
+      const available = [];
+      
+      for (const driver of drivers) {
+        const { rows: segments } = await client.query(
+          `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
+           FROM on_duty_segments 
+           WHERE driver_id = $1 AND end_utc > $2 
+           ORDER BY start_utc`,
+          [driver.driver_id, now.minus({ days: 8 }).toISO()]
+        );
+        
+        const dutySegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
+        const availability = calculateAvailableHours(dutySegments, now);
+        
+        if (availability.canDrive && availability.weeklyHoursAvailable > 8) {
+          available.push({
+            driver,
+            hoursAvailable: availability.weeklyHoursAvailable
+          });
+        }
+      }
+      
+      response.answer = `${available.length} drivers are available to work with sufficient hours.`;
+      response.data = available.sort((a, b) => b.hoursAvailable - a.hoursAvailable);
+      response.suggestions = [
+        'Show drivers with violations',
+        'Who needs rest tomorrow?',
+        'Optimize tomorrow\'s schedule'
+      ];
+    } else {
+      response.answer = 'I can help you with HOS compliance, violations, driver availability, and scheduling. What would you like to know?';
+      response.suggestions = [
+        'Show current HOS violations',
+        'Which drivers are available?',
+        'Predict violations for next week',
+        'Who needs a 34-hour restart?'
+      ];
+    }
+    
+    res.json(response);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'chat_failed', detail: String(e) });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/hos/driver/:driverId/status - Get real-time HOS status for a driver
+app.get('/api/hos/driver/:driverId/status', async (req, res) => {
+  const { driverId } = req.params;
+  const client = await pool.connect();
+  
+  try {
+    const now = DateTime.utc();
+    const { rows: segments } = await client.query(
+      `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
+       FROM on_duty_segments 
+       WHERE driver_id = $1 AND end_utc > $2 
+       ORDER BY start_utc`,
+      [driverId, now.minus({ days: 8 }).toISO()]
+    );
+    
+    const dutySegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
+    const compliance = checkCompliance(dutySegments, now);
+    const availability = calculateAvailableHours(dutySegments, now);
+    const recommendations = generateRecommendations(dutySegments, now);
+    
+    res.json({
+      driverId,
+      timestamp: now.toISO(),
+      compliance: compliance.compliant,
+      violations: compliance.violations,
+      metrics: compliance.metrics,
+      availability,
+      recommendations
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'status_failed', detail: String(e) });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/hos/schedule/analyze - Analyze schedule for violations
+app.post('/api/hos/schedule/analyze', async (req, res) => {
+  const { schedules, date } = req.body;
+  if (!schedules || !Array.isArray(schedules)) {
+    return res.status(400).json({ error: 'schedules_required' });
+  }
+  
+  const client = await pool.connect();
+  try {
+    const analysisDate = date ? DateTime.fromISO(date) : DateTime.now();
+    const results = [];
+    
+    for (const schedule of schedules) {
+      const { driverId, shiftStart, shiftEnd } = schedule;
+      
+      // Get existing segments
+      const { rows: segments } = await client.query(
+        `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
+         FROM on_duty_segments 
+         WHERE driver_id = $1 AND end_utc > $2 
+         ORDER BY start_utc`,
+        [driverId, analysisDate.minus({ days: 8 }).toISO()]
+      );
+      
+      const existingSegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
+      const plannedSegment = new DutySegment(shiftStart, shiftEnd, DUTY_STATUS.DRIVING);
+      
+      const projection = projectViolation(existingSegments, [plannedSegment], analysisDate);
+      
+      results.push({
+        driverId,
+        schedule,
+        violationPredicted: !!projection.violationTime,
+        violationDetails: projection
+      });
+    }
+    
+    res.json({ 
+      date: analysisDate.toISO(),
+      schedules: results,
+      totalViolationsPredicted: results.filter(r => r.violationPredicted).length
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'analysis_failed', detail: String(e) });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/hos/fleet/dashboard - Fleet-wide HOS dashboard data
+app.get('/api/hos/fleet/dashboard', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const now = DateTime.utc();
+    const { rows: drivers } = await client.query(
+      'SELECT driver_id, driver_name FROM drivers WHERE driver_status = $1',
+      ['active']
+    );
+    
+    const fleetStatus = {
+      totalDrivers: drivers.length,
+      compliant: 0,
+      violations: [],
+      warnings: [],
+      available: 0,
+      needingRest: 0
+    };
+    
+    for (const driver of drivers) {
+      const { rows: segments } = await client.query(
+        `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
+         FROM on_duty_segments 
+         WHERE driver_id = $1 AND end_utc > $2 
+         ORDER BY start_utc`,
+        [driver.driver_id, now.minus({ days: 8 }).toISO()]
+      );
+      
+      const dutySegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
+      const compliance = checkCompliance(dutySegments, now);
+      const availability = calculateAvailableHours(dutySegments, now);
+      
+      if (compliance.compliant) {
+        fleetStatus.compliant++;
+      } else {
+        fleetStatus.violations.push({
+          driver,
+          violations: compliance.violations
+        });
+      }
+      
+      if (availability.canDrive) {
+        fleetStatus.available++;
+      } else {
+        fleetStatus.needingRest++;
+      }
+      
+      if (availability.weeklyHoursAvailable < 10) {
+        fleetStatus.warnings.push({
+          driver,
+          type: 'LOW_HOURS',
+          message: `Only ${availability.weeklyHoursAvailable.toFixed(1)} hours available`
+        });
+      }
+    }
+    
+    res.json(fleetStatus);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'dashboard_failed', detail: String(e) });
+  } finally {
+    client.release();
+  }
 });
 
 // Static hosting for built frontend

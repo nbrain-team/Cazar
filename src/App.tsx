@@ -16,6 +16,7 @@ import SettingsPage from './pages/SettingsPage';
 import CompliancePage from './pages/CompliancePage';
 import Hos607Page from './pages/Hos607Page';
 import HosRulesPage from './pages/HosRulesPage';
+import HOSCompliancePage from './pages/HOSCompliancePage';
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ function App() {
                       <Route path="/compliance/:tab" element={<CompliancePage />} />
                       <Route path="/hos-607" element={<Hos607Page />} />
                       <Route path="/hos-rules" element={<HosRulesPage />} />
+                      <Route path="/hos" element={<HOSCompliancePage />} />
                       <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" />} />

@@ -8,7 +8,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Activity
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ expanded, onToggle }) => {
     { path: '/timecard', icon: Clock, label: 'Timecard' },
     { path: '/scheduling', icon: Calendar, label: 'Scheduling' },
     { path: '/drivers', icon: Users, label: 'Drivers' },
+    { path: '/hos', icon: Activity, label: 'HOS Compliance' },
     { path: '/compliance', icon: ShieldCheck, label: 'COMPLIANCE' },
     { path: '/hos-607', icon: ShieldCheck, label: 'Compliance & HOS 60/7' },
     { path: '/reports', icon: FileText, label: 'Reports' },
