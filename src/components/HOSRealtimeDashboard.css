@@ -1,0 +1,272 @@
+/* HOS Realtime Dashboard Styles */
+.hos-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Metrics Overview Section */
+.hos-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.hos-metric-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hos-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hos-metric-title {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.hos-metric-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--text-secondary);
+}
+
+.hos-metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.hos-metric-change {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Driver Status Section */
+.hos-drivers-section {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+.hos-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.hos-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.hos-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.hos-search {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  background: var(--input-bg);
+  font-size: 0.875rem;
+  width: 200px;
+}
+
+.hos-search:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.hos-filter-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--gray-light);
+  padding: 0.125rem;
+  border-radius: 0.5rem;
+}
+
+.hos-filter-tab {
+  padding: 0.375rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.hos-filter-tab:hover {
+  color: var(--text-primary);
+}
+
+.hos-filter-tab.active {
+  background: var(--card-bg);
+  color: var(--primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Driver Grid */
+.hos-drivers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.hos-driver-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hos-driver-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.hos-driver-card.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.hos-driver-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.hos-driver-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.hos-status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.hos-status-badge.available {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.hos-status-badge.limited {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.hos-status-badge.rest {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.hos-status-badge.violation {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.hos-driver-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hos-driver-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.hos-driver-metric-label {
+  color: var(--text-secondary);
+}
+
+.hos-driver-metric-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.hos-driver-metric-value.warning {
+  color: var(--warning);
+}
+
+.hos-driver-metric-value.danger {
+  color: var(--danger);
+}
+
+/* Loading State */
+.hos-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: var(--text-secondary);
+}
+
+.hos-spinner {
+  border: 2px solid var(--gray-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Update Time */
+.hos-update-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 1rem;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hos-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .hos-drivers-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .hos-section-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .hos-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .hos-search {
+    width: 100%;
+  }
+}

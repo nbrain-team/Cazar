@@ -1,0 +1,343 @@
+/* HOS Module - Comprehensive Styles */
+
+/* Base Layout Classes */
+.hos-container {
+  padding: 1.5rem;
+  background-color: var(--bg);
+  min-height: 100vh;
+}
+
+.hos-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.hos-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.hos-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.hos-grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.hos-grid-4 {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Typography */
+.hos-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.hos-subtitle {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin-bottom: 2rem;
+}
+
+.hos-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+/* Buttons */
+.hos-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hos-btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.hos-btn-primary:hover {
+  background: #1e40af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.hos-btn-secondary {
+  background: var(--gray-light);
+  color: var(--text-primary);
+}
+
+.hos-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* Inputs */
+.hos-input {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  background: var(--input-bg);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.hos-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Status Badges */
+.hos-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.hos-badge-success {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.hos-badge-warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.hos-badge-danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.hos-badge-info {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+/* Metric Cards */
+.hos-metric-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+.hos-metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.hos-metric-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.hos-metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.hos-metric-change {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+.hos-metric-icon {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0.2;
+}
+
+/* Flex Utilities */
+.hos-flex {
+  display: flex;
+}
+
+.hos-flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hos-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hos-gap-1 { gap: 0.5rem; }
+.hos-gap-2 { gap: 1rem; }
+.hos-gap-3 { gap: 1.5rem; }
+
+/* Spacing Utilities */
+.hos-mb-1 { margin-bottom: 0.5rem; }
+.hos-mb-2 { margin-bottom: 1rem; }
+.hos-mb-3 { margin-bottom: 1.5rem; }
+.hos-mb-4 { margin-bottom: 2rem; }
+
+/* Table Styles */
+.hos-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hos-table th {
+  background: var(--gray-light);
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.hos-table td {
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.hos-table tr:hover td {
+  background: var(--gray-light);
+}
+
+/* Loading State */
+.hos-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: var(--text-secondary);
+}
+
+.hos-spinner {
+  border: 2px solid var(--gray-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  animation: hos-spin 0.8s linear infinite;
+}
+
+@keyframes hos-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Alert Boxes */
+.hos-alert {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.hos-alert-info {
+  background: #EBF8FF;
+  border: 1px solid #BEE3F8;
+  color: #2C5282;
+}
+
+.hos-alert-warning {
+  background: #FFFDF7;
+  border: 1px solid #FED7AA;
+  color: #92400E;
+}
+
+.hos-alert-danger {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.hos-alert-success {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+}
+
+/* Chat Panel Specific */
+.hos-chat-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.hos-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.hos-chat-input-area {
+  border-top: 1px solid var(--border);
+  padding: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .hos-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .hos-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .hos-container {
+    padding: 1rem;
+  }
+  
+  .hos-card {
+    padding: 1rem;
+  }
+  
+  .hos-grid-2,
+  .hos-grid-3,
+  .hos-grid-4 {
+    grid-template-columns: 1fr;
+  }
+  
+  .hos-title {
+    font-size: 1.5rem;
+  }
+  
+  .hos-flex-between {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+}

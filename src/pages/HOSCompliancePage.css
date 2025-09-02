@@ -1,0 +1,235 @@
+/* HOS Compliance Page Styles */
+.hos-compliance-page {
+  min-height: 100vh;
+  background-color: var(--bg);
+  padding: 1.5rem;
+}
+
+.hos-header {
+  margin-bottom: 2rem;
+}
+
+.hos-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.hos-header p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* Tabs styling */
+.hos-tabs {
+  width: 100%;
+}
+
+.hos-tabs-list {
+  display: flex;
+  gap: 0.25rem;
+  background-color: var(--gray-light);
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+}
+
+.hos-tab-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: calc(var(--radius) - 4px);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.hos-tab-trigger:hover {
+  color: var(--text-primary);
+}
+
+.hos-tab-trigger[data-state="active"] {
+  background-color: var(--card-bg);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.hos-tab-trigger svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Tab content */
+.hos-tab-content {
+  margin-top: 0;
+}
+
+.hos-tab-content[data-state="inactive"] {
+  display: none;
+}
+
+/* Grid layouts */
+.hos-grid-container {
+  background-color: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.hos-chat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .hos-chat-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.hos-chat-main {
+  height: 700px;
+}
+
+.hos-chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Quick Stats Card */
+.hos-stats-card {
+  background-color: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.hos-stats-card h3 {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.hos-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.hos-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hos-stat-label {
+  color: var(--text-secondary);
+}
+
+.hos-stat-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.hos-stat-value.danger {
+  color: var(--danger);
+}
+
+.hos-stat-value.warning {
+  color: var(--warning);
+}
+
+.hos-stat-value.success {
+  color: var(--success);
+}
+
+/* Pro Tips Card */
+.hos-tips-card {
+  background-color: #EBF8FF;
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1px solid #BEE3F8;
+}
+
+.hos-tips-card h4 {
+  font-weight: 600;
+  color: #2B6CB0;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.hos-tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #2C5282;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hos-tips-list li {
+  padding-left: 1rem;
+  position: relative;
+}
+
+.hos-tips-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+}
+
+/* Settings placeholder */
+.hos-settings-placeholder {
+  background-color: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+.hos-settings-placeholder h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.hos-settings-placeholder p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .hos-tabs-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  
+  .hos-tabs-list::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .hos-tab-trigger {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+  }
+  
+  .hos-tab-trigger svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+}

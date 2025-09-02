@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Clock, AlertTriangle, CheckCircle, TrendingUp, AlertCircle } from 'lucide-react';
 import { DatabaseService } from '../services/database';
 import type { Driver } from '../types';
+import './HOSRealtimeDashboard.css';
+import './HOSModule.css';
 
 interface DriverHOSStatus {
   driver: Driver;
@@ -164,25 +166,25 @@ export const HOSRealtimeDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="hos-loading">
+        <div className="hos-spinner"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="hos-dashboard">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="hos-flex-between hos-mb-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">HOS Real-time Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="hos-section-title">HOS Real-time Dashboard</h2>
+          <p className="hos-update-time">
             Last updated: {lastUpdate.toLocaleTimeString()}
           </p>
         </div>
         <button
           onClick={loadDashboardData}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="hos-btn hos-btn-primary"
         >
           Refresh
         </button>
@@ -190,15 +192,15 @@ export const HOSRealtimeDashboard: React.FC = () => {
 
       {/* Fleet Overview Cards */}
       {fleetMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
+        <div className="hos-grid hos-grid-4">
+          <div className="hos-metric-card">
+            <div className="hos-metric-header">
               <div>
-                <p className="text-sm font-medium text-gray-600">Available Drivers</p>
-                <p className="text-2xl font-bold text-green-600">{fleetMetrics.availableDrivers}</p>
-                <p className="text-xs text-gray-500 mt-1">Can drive full shifts</p>
+                <p className="hos-metric-label">Available Drivers</p>
+                <p className="hos-metric-value" style={{color: 'var(--success)'}}>{fleetMetrics.availableDrivers}</p>
+                <p className="hos-metric-change">Can drive full shifts</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-600 opacity-20" />
+              <CheckCircle className="hos-metric-icon" style={{color: 'var(--success)'}} />
             </div>
           </div>
 

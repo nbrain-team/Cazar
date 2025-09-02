@@ -7,12 +7,14 @@ import { HOSSmartScheduler } from '../components/HOSSmartScheduler';
 import { HOSViolationAnalytics } from '../components/HOSViolationAnalytics';
 import { HOSComplianceReports } from '../components/HOSComplianceReports';
 import Hos607Page from './Hos607Page';
+import './HOSCompliancePage.css';
+import '../components/HOSModule.css';
 
 // Placeholder component for settings
 const HOSSettings = () => (
-  <div className="p-6 bg-white rounded-lg shadow">
-    <h3 className="text-lg font-semibold mb-4">HOS Settings</h3>
-    <p className="text-gray-600">Coming soon: Configure alert thresholds, notification preferences, and compliance rules.</p>
+  <div className="hos-settings-placeholder">
+    <h3>HOS Settings</h3>
+    <p>Coming soon: Configure alert thresholds, notification preferences, and compliance rules.</p>
   </div>
 );
 
@@ -20,162 +22,108 @@ export default function HOSCompliancePage() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">HOS Compliance Center</h1>
-          <p className="text-gray-600 mt-2">
-            Comprehensive Hours of Service management, violation prevention, and compliance tracking
-          </p>
-        </div>
+    <div className="hos-compliance-page">
+      <div className="hos-header">
+        <h1>HOS Compliance Center</h1>
+        <p>Comprehensive Hours of Service management, violation prevention, and compliance tracking</p>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="flex space-x-1 rounded-lg bg-gray-100 p-1 mb-6">
-            <TabsTrigger
-              value="dashboard"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'dashboard'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Activity className="w-4 h-4" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="hos-tabs">
+        <TabsList className="hos-tabs-list">
+            <TabsTrigger value="dashboard" className="hos-tab-trigger">
+              <Activity />
               Real-time Dashboard
             </TabsTrigger>
-            <TabsTrigger
-              value="grid"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'grid'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
+            <TabsTrigger value="grid" className="hos-tab-trigger">
+              <FileText />
               60/7 Grid View
             </TabsTrigger>
-            <TabsTrigger
-              value="chat"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'chat'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
+            <TabsTrigger value="chat" className="hos-tab-trigger">
+              <MessageSquare />
               Compliance Assistant
             </TabsTrigger>
-            <TabsTrigger
-              value="scheduler"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'scheduler'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
+            <TabsTrigger value="scheduler" className="hos-tab-trigger">
+              <Calendar />
               Smart Scheduler
             </TabsTrigger>
-            <TabsTrigger
-              value="analytics"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'analytics'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4" />
+            <TabsTrigger value="analytics" className="hos-tab-trigger">
+              <TrendingUp />
               Analytics
             </TabsTrigger>
-            <TabsTrigger
-              value="reports"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'reports'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
+            <TabsTrigger value="reports" className="hos-tab-trigger">
+              <FileText />
               Reports
             </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'settings'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
+            <TabsTrigger value="settings" className="hos-tab-trigger">
+              <Settings />
               Settings
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard" className="mt-0">
+          <TabsContent value="dashboard" className="hos-tab-content">
             <HOSRealtimeDashboard />
           </TabsContent>
 
-          <TabsContent value="grid" className="mt-0">
-            <div className="bg-white rounded-lg shadow">
+          <TabsContent value="grid" className="hos-tab-content">
+            <div className="hos-grid-container">
               <Hos607Page />
             </div>
           </TabsContent>
 
-          <TabsContent value="chat" className="mt-0">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <div className="h-[700px]">
-                  <HOSChatPanel />
-                </div>
+          <TabsContent value="chat" className="hos-tab-content">
+            <div className="hos-chat-grid">
+              <div className="hos-chat-main">
+                <HOSChatPanel />
               </div>
-              <div className="space-y-4">
-                <div className="bg-white rounded-lg shadow p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Quick Stats</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Active Drivers:</span>
-                      <span className="font-medium">25</span>
+              <div className="hos-chat-sidebar">
+                <div className="hos-stats-card">
+                  <h3>Quick Stats</h3>
+                  <div className="hos-stats-list">
+                    <div className="hos-stat-item">
+                      <span className="hos-stat-label">Active Drivers:</span>
+                      <span className="hos-stat-value">25</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Current Violations:</span>
-                      <span className="font-medium text-red-600">3</span>
+                    <div className="hos-stat-item">
+                      <span className="hos-stat-label">Current Violations:</span>
+                      <span className="hos-stat-value danger">3</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">At Risk (24h):</span>
-                      <span className="font-medium text-orange-600">7</span>
+                    <div className="hos-stat-item">
+                      <span className="hos-stat-label">At Risk (24h):</span>
+                      <span className="hos-stat-value warning">7</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Compliance Rate:</span>
-                      <span className="font-medium text-green-600">88%</span>
+                    <div className="hos-stat-item">
+                      <span className="hos-stat-label">Compliance Rate:</span>
+                      <span className="hos-stat-value success">88%</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-900 mb-2">💡 Pro Tips</h4>
-                  <ul className="space-y-2 text-sm text-blue-800">
-                    <li>• Ask about specific drivers by name</li>
-                    <li>• Request predictions for upcoming shifts</li>
-                    <li>• Get explanations of any HOS rule</li>
-                    <li>• Find optimal driver assignments</li>
+                <div className="hos-tips-card">
+                  <h4>💡 Pro Tips</h4>
+                  <ul className="hos-tips-list">
+                    <li>Ask about specific drivers by name</li>
+                    <li>Request predictions for upcoming shifts</li>
+                    <li>Get explanations of any HOS rule</li>
+                    <li>Find optimal driver assignments</li>
                   </ul>
                 </div>
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="scheduler" className="mt-0">
+          <TabsContent value="scheduler" className="hos-tab-content">
             <HOSSmartScheduler />
           </TabsContent>
 
-          <TabsContent value="analytics" className="mt-0">
+          <TabsContent value="analytics" className="hos-tab-content">
             <HOSViolationAnalytics />
           </TabsContent>
 
-          <TabsContent value="reports" className="mt-0">
+          <TabsContent value="reports" className="hos-tab-content">
             <HOSComplianceReports />
           </TabsContent>
 
-          <TabsContent value="settings" className="mt-0">
+          <TabsContent value="settings" className="hos-tab-content">
             <HOSSettings />
           </TabsContent>
         </Tabs>
