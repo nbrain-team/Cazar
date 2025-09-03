@@ -32,7 +32,9 @@ export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
       }
     `;
     document.head.appendChild(style);
-    return () => document.head.removeChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
   }, []);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', text: 'Hi! I can help with operations metrics and HOS compliance. Try asking about:\n\n• **Operations:** "Compare DCR vs SWC‑POD for DYY5 vs VNY1"\n• **HOS Compliance:** "Do I have any drivers at risk of violating 7 days of work in a row?"\n• **Deep Research:** "Deep research: top 5 speeding event rate"' }
@@ -86,11 +88,6 @@ export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatFriendly = (text: string) => {
-    // Light-touch formatting: ensure line breaks and bullets render nicely
-    return text.replaceAll(' - ', '\n- ');
   };
 
   return (
