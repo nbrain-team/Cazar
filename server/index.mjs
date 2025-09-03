@@ -689,7 +689,7 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
           if (!nextStart.isValid) break;
           // Only if within the same local calendar day
           if (!nextStart.hasSame(endAdj, 'day')) break;
-          const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
+          const gapMin = Math.round(nextStart.diff(endAdj, 'minutes').minutes);
           // If gap is between 0 and 180 minutes (3 hours), treat as potential lunch break
           // This captures both short breaks and longer lunch periods
           if (gapMin > 0 && gapMin <= 180) {
@@ -973,10 +973,10 @@ app.get('/api/hos/grid', async (req, res) => {
            brks AS (
              SELECT b.day_start_utc, b.day_end_utc,
                     COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0),0) AS break_minutes,
-                    COALESCE(MAX(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS qual_meal_exists,
-                    MIN(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN br.start_utc END) AS earliest_qual_meal_start,
-                    COALESCE(MAX(CASE WHEN (br.source_row_ref ->> 'inferred') = 'true' AND EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS inferred_meal_exists,
-                    COALESCE(MAX(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0),0) AS longest_break_minutes
+                    COALESCE(MAX(CASE WHEN ROUND(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0) >= $4 THEN 1 ELSE 0 END),0) AS qual_meal_exists,
+                    MIN(CASE WHEN ROUND(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0) >= $4 THEN br.start_utc END) AS earliest_qual_meal_start,
+                    COALESCE(MAX(CASE WHEN (br.source_row_ref ->> 'inferred') = 'true' AND ROUND(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0) >= $4 THEN 1 ELSE 0 END),0) AS inferred_meal_exists,
+                    COALESCE(MAX(ROUND(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0)),0) AS longest_break_minutes
                FROM bounds b
                LEFT JOIN break_segments br ON br.driver_id=$3 AND br.end_utc > b.day_start_utc AND br.start_utc < b.day_end_utc
               GROUP BY b.day_start_utc, b.day_end_utc

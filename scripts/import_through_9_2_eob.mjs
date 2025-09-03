@@ -136,7 +136,7 @@ async function main() {
           // Only if within the same local calendar day
           if (!nextStart.hasSame(endAdj, 'day')) break;
           
-                              const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
+                              const gapMin = Math.round(nextStart.diff(endAdj, 'minutes').minutes);
                     // If gap is between 0 and 180 minutes (3 hours), treat as potential lunch break
                     // This captures both short breaks and longer lunch periods
                     if (gapMin > 0 && gapMin <= 180) {
