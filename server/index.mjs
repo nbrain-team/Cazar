@@ -921,10 +921,8 @@ app.get('/api/hos/grid', async (req, res) => {
         status = 'AT_RISK';
         window_reasons.push({ type: 'HOS_60_7', severity: 'AT_RISK', message: 'Near 60/7 cap', values: { hours_used, hours_available, other_minutes } });
       }
-      if (!meal_ok) {
-        if (status !== 'VIOLATION') status = 'AT_RISK';
-        window_reasons.push({ type: 'MEAL', severity: 'AT_RISK', message: `Meal break (${meal_min_minutes}m) due by ${meal_required_by_hour}h on-duty`, values: {}, recommended_action: 'Prompt meal before 6th hour; adjust route timing' });
-      }
+      // Note: Meal break compliance is checked per-day, not at window level
+      // The meal_ok variable only checks the most recent day, so we don't use it for window-level warnings
       if (rest_hours > 0 && rest_hours < min_rest_hours_between_shifts) {
         status = 'VIOLATION';
         window_reasons.push({ type: 'REST', severity: 'VIOLATION', message: `Short rest (${rest_hours.toFixed(2)}h) < ${min_rest_hours_between_shifts}h`, values: { rest_hours }, recommended_action: 'Reassign or delay start to ensure 10h rest' });
@@ -1011,12 +1009,18 @@ app.get('/api/hos/grid', async (req, res) => {
           const qual = Number(r.qual_meal_exists || 0) === 1;
           const inferred = Number(r.inferred_meal_exists || 0) === 1;
           const mealBy6Ok = !!(firstStart && earliestQual && earliestQual <= firstStart.plus({ hours: meal_required_by_hour }));
-          if (!qual || !mealBy6Ok) {
+          
+          // Only flag a violation if there's no qualifying meal at all
+          if (!qual) {
+            // No qualifying meal exists
+            reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+          } else if (qual && !mealBy6Ok) {
+            // Meal exists but was taken after 6 hours
             if (inferred) {
-              // Looks like lunch taken but mis-typed; classify as Driver Log Error, not a violation
-              reasonsForDay.push({ type: 'DRIVER_LOG_ERROR', severity: 'NOTICE', message: 'Lunch likely taken (gap 30–60m) but not logged as LP by 6h', values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+              // Looks like lunch taken but mis-typed and taken late
+              reasonsForDay.push({ type: 'DRIVER_LOG_ERROR', severity: 'NOTICE', message: 'Lunch taken late (after 6h) and not logged as LP', values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
             } else {
-              reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+              reasonsForDay.push({ type: 'MEAL_LATE', severity: 'AT_RISK', message: `Meal taken late (after 6h on-duty)`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
             }
           }
         }
