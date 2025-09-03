@@ -1063,17 +1063,19 @@ app.get('/api/hos/grid', async (req, res) => {
       });
       
       // Calculate projected violations with scheduled hours
-      let projected_total = 0;
-      let projected_consec = 0;
       const projected_reasons = [];
       
-      // Calculate current state
-      for (let i = 0; i < 7; i++) {
-        if (projected_hours[i] > 0) {
-          projected_total += projected_hours[i];
+      // Calculate consecutive days for projection
+      let projected_consec = 0;
+      let found_break = false;
+      
+      // Count consecutive days backwards from most recent day with hours
+      for (let i = 6; i >= 0; i--) {
+        if (projected_hours[i] > 0 && !found_break) {
           projected_consec++;
-        } else {
-          projected_consec = 0;
+        } else if (projected_hours[i] === 0 && projected_consec > 0) {
+          found_break = true;
+          break;
         }
       }
       
@@ -1082,10 +1084,9 @@ app.get('/api/hos/grid', async (req, res) => {
         const schedule = scheduleMap.get(day.iso);
         if (schedule && DateTime.fromISO(day.iso) >= DateTime.now().startOf('day')) {
           // This is a future scheduled day
-          const projectedDayTotal = projected_total;
           
-          // Check 60/7 limit
-          if (projectedDayTotal + schedule.hours > 60) {
+          // Check 60/7 limit using the actual hours_used calculation
+          if (hours_used + schedule.hours > 60) {
             projected_reasons.push({
               type: 'PROJECTED_60_7',
               severity: 'AT_RISK',
@@ -1094,8 +1095,17 @@ app.get('/api/hos/grid', async (req, res) => {
             });
           }
           
-          // Check consecutive days
-          if (projected_consec >= 4 && schedule.hours > 0) {
+          // Check consecutive days - only if this would continue the streak
+          // Need to check if there are any days off between now and the scheduled day
+          let continuous_streak = true;
+          for (let i = 6; i > idx; i--) {
+            if (projected_hours[i] === 0) {
+              continuous_streak = false;
+              break;
+            }
+          }
+          
+          if (continuous_streak && projected_consec >= 4 && schedule.hours > 0) {
             projected_reasons.push({
               type: 'PROJECTED_CONSECUTIVE',
               severity: 'AT_RISK', 
