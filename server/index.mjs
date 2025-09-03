@@ -1065,19 +1065,6 @@ app.get('/api/hos/grid', async (req, res) => {
       // Calculate projected violations with scheduled hours
       const projected_reasons = [];
       
-      // Calculate current consecutive days streak (counting backwards from today)
-      let projected_consec = 0;
-      
-      // Start from the most recent day and count backwards
-      for (let i = 6; i >= 0; i--) {
-        if (projected_hours[i] > 0) {
-          projected_consec++;
-        } else {
-          // Found a day off, streak is broken
-          break;
-        }
-      }
-      
       // Check if future scheduled work will cause issues
       days.forEach((day, idx) => {
         const schedule = scheduleMap.get(day.iso);
@@ -1094,21 +1081,31 @@ app.get('/api/hos/grid', async (req, res) => {
             });
           }
           
-          // Check consecutive days - only if this would continue the streak
-          // Need to check if there are any days off between now and the scheduled day
-          let continuous_streak = true;
-          for (let i = 6; i > idx; i--) {
-            if (projected_hours[i] === 0) {
-              continuous_streak = false;
-              break;
+          // Calculate consecutive days up to and including this scheduled day
+          let consecutiveDaysToScheduled = 0;
+          let foundBreak = false;
+          
+          // Count backwards from the scheduled day
+          for (let i = idx; i >= 0 && !foundBreak; i--) {
+            if (i === idx) {
+              // This is the scheduled day itself - count it if it has hours
+              if (schedule.hours > 0) {
+                consecutiveDaysToScheduled = 1;
+              }
+            } else if (projected_hours[i] > 0) {
+              consecutiveDaysToScheduled++;
+            } else {
+              // Found a day off before the scheduled day
+              foundBreak = true;
             }
           }
           
-          if (continuous_streak && projected_consec >= 4 && schedule.hours > 0) {
+          // Only warn if this would be 5th or more consecutive day
+          if (consecutiveDaysToScheduled >= 5 && schedule.hours > 0) {
             projected_reasons.push({
               type: 'PROJECTED_CONSECUTIVE',
               severity: 'AT_RISK', 
-              message: `Scheduled ${day.mmdd}: Would be ${projected_consec + 1}th consecutive day`,
+              message: `Scheduled ${day.mmdd}: Would be ${consecutiveDaysToScheduled}th consecutive day`,
               day: day.label
             });
           }
