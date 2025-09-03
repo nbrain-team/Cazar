@@ -1445,25 +1445,59 @@ app.post('/api/hos/chat', async (req, res) => {
         response.answer = '✅ **No drivers at risk of consecutive day violations!**\n\n';
         response.answer += 'All drivers have adequate days off in their schedule.';
       } else {
-        response.answer = `⚠️ **${consecutiveRiskDrivers.length} drivers with consecutive day concerns:**\n\n`;
+        response.answer = `# ⚠️ Consecutive Days Analysis\n\n`;
+        response.answer += `**${consecutiveRiskDrivers.length} drivers** with consecutive day concerns\n\n`;
+        response.answer += `---\n\n`;
         
-        // Sort by consecutive days (highest first)
-        consecutiveRiskDrivers.sort((a, b) => b.consecutive_days - a.consecutive_days);
+        // Group drivers by status
+        const violations = consecutiveRiskDrivers.filter(d => d.consecutive_days >= 7);
+        const atRisk = consecutiveRiskDrivers.filter(d => d.consecutive_days === 6);
+        const warnings = consecutiveRiskDrivers.filter(d => d.consecutive_days === 5);
         
-        consecutiveRiskDrivers.forEach(d => {
-          const statusEmoji = d.consecutive_days >= 7 ? '🚫' : '⚠️';
-          response.answer += `${statusEmoji} **${d.driver_name}** - Day ${d.consecutive_days}\n`;
+        if (violations.length > 0) {
+          response.answer += `## 🚫 VIOLATIONS (${violations.length} drivers)\n\n`;
+          response.answer += `> **Immediate action required** - These drivers are working 7+ consecutive days\n\n`;
           
-          if (d.consecutive_days >= 7) {
-            response.answer += `   └─ VIOLATION: Working ${d.consecutive_days} consecutive days\n`;
-          } else if (d.consecutive_days === 6) {
-            response.answer += `   └─ AT RISK: 6th consecutive day (one more day = violation)\n`;
-          } else if (d.consecutive_days === 5) {
-            response.answer += `   └─ WARNING: 5th consecutive day\n`;
-          }
-        });
+          violations.forEach(d => {
+            response.answer += `### ${d.driver_name}\n`;
+            response.answer += `- **Status:** Day ${d.consecutive_days} (VIOLATION)\n`;
+            response.answer += `- **Hours Available:** ${d.hours_available} hours\n`;
+            response.answer += `- **Action Required:** Must take immediate day off\n\n`;
+          });
+          response.answer += `---\n\n`;
+        }
         
-        response.answer += '\n💡 **Recommendation:** Schedule days off for these drivers to prevent violations.';
+        if (atRisk.length > 0) {
+          response.answer += `## ⚠️ AT RISK (${atRisk.length} drivers)\n\n`;
+          response.answer += `> **Critical** - One more day will result in violation\n\n`;
+          
+          atRisk.forEach(d => {
+            response.answer += `### ${d.driver_name}\n`;
+            response.answer += `- **Status:** Day 6 (AT RISK)\n`;
+            response.answer += `- **Hours Available:** ${d.hours_available} hours\n`;
+            response.answer += `- **Action Required:** Schedule day off tomorrow\n\n`;
+          });
+          response.answer += `---\n\n`;
+        }
+        
+        if (warnings.length > 0) {
+          response.answer += `## ⚠️ WARNINGS (${warnings.length} drivers)\n\n`;
+          response.answer += `> **Monitor closely** - Approaching consecutive day limits\n\n`;
+          
+          warnings.forEach(d => {
+            response.answer += `### ${d.driver_name}\n`;
+            response.answer += `- **Status:** Day 5 (WARNING)\n`;
+            response.answer += `- **Hours Available:** ${d.hours_available} hours\n`;
+            response.answer += `- **Recommendation:** Plan day off within 2 days\n\n`;
+          });
+        }
+        
+        response.answer += `---\n\n`;
+        response.answer += `## 💡 Recommendations\n\n`;
+        response.answer += `1. **Immediate:** Remove violation drivers from schedule today\n`;
+        response.answer += `2. **Tomorrow:** Ensure at-risk drivers get mandatory day off\n`;
+        response.answer += `3. **This Week:** Rotate warning drivers to prevent escalation\n`;
+        response.answer += `4. **Long-term:** Implement automatic consecutive day tracking in scheduling\n`;
       }
       
       response.data = consecutiveRiskDrivers;
