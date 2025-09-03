@@ -138,6 +138,42 @@ async function main() {
            VALUES ($1, $2, 'worked', $3, $4, $5, 1.0)`,
           [driverId, uploadId, startUtc.toISO(), endUtc.toISO(), JSON.stringify({ src: 'sept-2-report', line: li })]
         );
+        
+        // Check for lunch breaks: infer lunch when gap is less than 60 minutes to next row
+        for (let j = li + 1; j < records.length; j++) {
+          const next = records[j];
+          if (!next || !next.length) continue;
+          const nextPos = String(next[iPos] || '').trim();
+          const nextIn = String(next[iIn] || '').trim();
+          if (nextPos !== posId) continue;
+          
+          let nextStart = DateTime.invalid('init');
+          for (const fmt of tryFormats) { 
+            nextStart = DateTime.fromFormat(nextIn, fmt, { zone: tz }); 
+            if (nextStart.isValid) break; 
+          }
+          if (!nextStart.isValid) break;
+          
+          // Only if within the same local calendar day
+          if (!nextStart.hasSame(endAdj, 'day')) break;
+          
+          const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
+          // If gap is less than 60 minutes, treat as lunch break
+          if (gapMin > 0 && gapMin < 60) {
+            const lunchStartUtc = endUtc;
+            const lunchEndUtc = nextStart.toUTC();
+            if (lunchEndUtc > lunchStartUtc) {
+              await client.query(
+                `INSERT INTO break_segments (driver_id, upload_id, label, start_utc, end_utc, source_row_ref)
+                 VALUES ($1, $2, 'Lunch', $3, $4, $5)`,
+                [driverId, uploadId, lunchStartUtc.toISO(), lunchEndUtc.toISO(), 
+                 JSON.stringify({ inferred: true, reason: 'gap_less_than_60min', from_line: li, to_line: j, gap_minutes: gapMin })]
+              );
+            }
+          }
+          break;
+        }
+        
         segs++; 
         rowsIngested++;
       } catch (e) {

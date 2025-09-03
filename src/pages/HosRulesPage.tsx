@@ -35,8 +35,10 @@ export default function HosRulesPage() {
         <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>3) Meal / Lunch Break Compliance</h2>
         <ul>
           <li>Drivers must take a <strong>Lunch break of ≥30 minutes</strong> by the <strong>6th on‑duty hour</strong> of their day.</li>
-          <li>In timecards: when a row’s Out Punch Type is <strong>LP</strong>, that marks the <em>start</em> of Lunch. Lunch <em>ends</em> at the next row’s In time for the same Position ID.</li>
-          <li>If a Driver reaches 6 on‑duty hours with no qualifying Lunch, we flag a violation.</li>
+          <li>Lunch breaks are automatically detected when a driver punches out and then punches back in <strong>less than 60 minutes later</strong>.</li>
+          <li>The Out Punch Type <strong>LP</strong> designation is optional - the system will detect lunch breaks based on timing patterns.</li>
+          <li>Lunch break time is excluded from hours worked calculations.</li>
+          <li>If a Driver reaches 6 on‑duty hours with no qualifying Lunch (≥30 minutes), we flag a violation.</li>
         </ul>
       </div>
 

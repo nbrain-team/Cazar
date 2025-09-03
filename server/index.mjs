@@ -675,33 +675,44 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
             }
             break;
           }
-        } else {
-          // If not explicitly LP: infer lunch when a same-day gap of 30-60 minutes exists to the next row for this driver
-          for (let j = li + 1; j < records.length; j++) {
-            const next = records[j];
-            if (!next || !next.length) continue;
-            const nextPos = String(next[iPos] || '').trim();
-            const nextIn = String(next[iIn] || '').trim();
-            if (nextPos !== posId) continue;
-            let nextStart = DateTime.invalid('init');
-            for (const fmt of tryFormats) { nextStart = DateTime.fromFormat(nextIn, fmt, { zone: tz }); if (nextStart.isValid) break; }
-            if (!nextStart.isValid) break;
-            // Only if within the same local calendar day
-            if (!nextStart.hasSame(endAdj, 'day')) break;
-            const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
-            if (gapMin >= 30 && gapMin <= 60) {
-              const infStartUtc = endUtc;
-              const infEndUtc = nextStart.toUTC();
-              if (infEndUtc > infStartUtc) {
+        }
+        // Always check for lunch breaks: infer lunch when a gap of less than 60 minutes exists to the next row for this driver
+        // This runs regardless of LP designation
+        for (let j = li + 1; j < records.length; j++) {
+          const next = records[j];
+          if (!next || !next.length) continue;
+          const nextPos = String(next[iPos] || '').trim();
+          const nextIn = String(next[iIn] || '').trim();
+          if (nextPos !== posId) continue;
+          let nextStart = DateTime.invalid('init');
+          for (const fmt of tryFormats) { nextStart = DateTime.fromFormat(nextIn, fmt, { zone: tz }); if (nextStart.isValid) break; }
+          if (!nextStart.isValid) break;
+          // Only if within the same local calendar day
+          if (!nextStart.hasSame(endAdj, 'day')) break;
+          const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
+          // If gap is less than 60 minutes, treat as lunch break
+          if (gapMin > 0 && gapMin < 60) {
+            const infStartUtc = endUtc;
+            const infEndUtc = nextStart.toUTC();
+            if (infEndUtc > infStartUtc) {
+              // Check if we already created a break segment for LP designation
+              const existingBreak = await client.query(
+                `SELECT 1 FROM break_segments 
+                 WHERE driver_id = $1 AND start_utc = $2 AND end_utc = $3 
+                 LIMIT 1`,
+                [driverId, infStartUtc.toISO(), infEndUtc.toISO()]
+              );
+              
+              if (existingBreak.rows.length === 0) {
                 await client.query(
                   `INSERT INTO break_segments (driver_id, upload_id, label, start_utc, end_utc, source_row_ref)
-                   VALUES ($1, $2, 'Lunch (inferred)', $3, $4, $5)`,
-                  [driverId, uploadId, infStartUtc.toISO(), infEndUtc.toISO(), JSON.stringify({ inferred: true, reason: 'gap_between_segments', from_line: li, to_line: j, gap_minutes: gapMin })]
+                   VALUES ($1, $2, 'Lunch', $3, $4, $5)`,
+                  [driverId, uploadId, infStartUtc.toISO(), infEndUtc.toISO(), JSON.stringify({ inferred: true, reason: 'gap_less_than_60min', from_line: li, to_line: j, gap_minutes: gapMin })]
                 );
               }
             }
-            break;
           }
+          break;
         }
           segs++; rowsIngested++;
         } catch (rowErr) {
