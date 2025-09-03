@@ -1292,6 +1292,33 @@ app.post('/api/hos/chat', async (req, res) => {
       const hours_used = Number(used[0]?.hours_used || 0);
       const hours_available = Math.max(0, 60 - hours_used);
       
+      // Get daily work history to check consecutive days
+      const { rows: dailyWork } = await client.query(
+        `WITH daily_hours AS (
+          SELECT 
+            DATE(timezone('America/Los_Angeles', start_utc)) as work_date,
+            SUM(EXTRACT(EPOCH FROM (end_utc - start_utc))/3600.0) as hours
+          FROM on_duty_segments
+          WHERE driver_id = $1 
+            AND DATE(timezone('America/Los_Angeles', start_utc)) >= CURRENT_DATE - INTERVAL '7 days'
+            AND DATE(timezone('America/Los_Angeles', start_utc)) <= CURRENT_DATE
+          GROUP BY DATE(timezone('America/Los_Angeles', start_utc))
+          ORDER BY work_date DESC
+        )
+        SELECT * FROM daily_hours`,
+        [d.driver_id]
+      );
+      
+      // Count consecutive days worked
+      let consecutiveDays = 0;
+      for (const day of dailyWork) {
+        if (day.hours > 0) {
+          consecutiveDays++;
+        } else {
+          break; // Found a day off
+        }
+      }
+      
       // Check for violations and at-risk status
       let status = 'OK';
       const violations = [];
@@ -1313,11 +1340,29 @@ app.post('/api/hos/chat', async (req, res) => {
         });
       }
       
+      // Check consecutive days
+      if (consecutiveDays >= 7) {
+        status = 'VIOLATION';
+        violations.push({
+          type: 'CONSECUTIVE_DAYS',
+          message: `Working ${consecutiveDays} consecutive days (7+ is a violation)`,
+          severity: 'CRITICAL'
+        });
+      } else if (consecutiveDays >= 5) {
+        if (status === 'OK') status = 'AT_RISK';
+        warnings.push({
+          type: 'CONSECUTIVE_DAYS',
+          message: `Currently on ${consecutiveDays}th consecutive work day`,
+          severity: 'MEDIUM'
+        });
+      }
+      
       driverData.push({
         driver_id: d.driver_id,
         driver_name: d.driver_name,
         hours_used: hours_used.toFixed(1),
         hours_available: hours_available.toFixed(1),
+        consecutive_days: consecutiveDays,
         status,
         violations,
         warnings
@@ -1382,6 +1427,46 @@ app.post('/api/hos/chat', async (req, res) => {
         'Show me current violations',
         'Who needs a rest break?',
         'Which drivers worked the most this week?'
+      ];
+      
+    } else if (normalizedQuery.includes('consecutive') || normalizedQuery.includes('days in a row') || normalizedQuery.includes('7 days') || normalizedQuery.includes('risk of violating')) {
+      // Check for consecutive days violations and risks
+      const consecutiveRiskDrivers = driverData.filter(d => 
+        d.consecutive_days >= 5 || 
+        d.warnings.some(w => w.type === 'CONSECUTIVE_DAYS') ||
+        d.violations.some(v => v.type === 'CONSECUTIVE_DAYS')
+      );
+      
+      if (consecutiveRiskDrivers.length === 0) {
+        response.answer = '✅ **No drivers at risk of consecutive day violations!**\n\n';
+        response.answer += 'All drivers have adequate days off in their schedule.';
+      } else {
+        response.answer = `⚠️ **${consecutiveRiskDrivers.length} drivers with consecutive day concerns:**\n\n`;
+        
+        // Sort by consecutive days (highest first)
+        consecutiveRiskDrivers.sort((a, b) => b.consecutive_days - a.consecutive_days);
+        
+        consecutiveRiskDrivers.forEach(d => {
+          const statusEmoji = d.consecutive_days >= 7 ? '🚫' : '⚠️';
+          response.answer += `${statusEmoji} **${d.driver_name}** - Day ${d.consecutive_days}\n`;
+          
+          if (d.consecutive_days >= 7) {
+            response.answer += `   └─ VIOLATION: Working ${d.consecutive_days} consecutive days\n`;
+          } else if (d.consecutive_days === 6) {
+            response.answer += `   └─ AT RISK: 6th consecutive day (one more day = violation)\n`;
+          } else if (d.consecutive_days === 5) {
+            response.answer += `   └─ WARNING: 5th consecutive day\n`;
+          }
+        });
+        
+        response.answer += '\n💡 **Recommendation:** Schedule days off for these drivers to prevent violations.';
+      }
+      
+      response.data = consecutiveRiskDrivers;
+      response.suggestions = [
+        'Show all HOS violations',
+        'Which drivers are available today?',
+        'Explain the consecutive days rule'
       ];
       
     } else if (normalizedQuery.includes('rule') || normalizedQuery.includes('regulation') || normalizedQuery.includes('60 hour') || normalizedQuery.includes('70 hour')) {
