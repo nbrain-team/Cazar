@@ -210,6 +210,20 @@ export default function Hos607Page() {
                               )) : <div>No day-level data</div>}
                           </div>
                         </div>
+                        {/* Demo data note */}
+                        {d.driver_id.startsWith('DEMO') && (
+                          <div style={{ 
+                            marginTop: '1rem', 
+                            padding: '0.5rem', 
+                            backgroundColor: '#f0f0f0', 
+                            borderRadius: '4px',
+                            fontSize: '0.875rem',
+                            color: '#666',
+                            fontStyle: 'italic'
+                          }}>
+                            ⚠️ Note: This is mock data for demonstration purposes
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>

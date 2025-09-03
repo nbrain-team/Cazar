@@ -754,18 +754,27 @@ app.get('/api/hos/grid', async (req, res) => {
       });
       days.splice(0, days.length, ...computed);
     }
-    // load distinct drivers that have segments in window
+    // load distinct drivers that have segments in window OR schedule predictions
+    const actualDataEnd = end.minus({ days: 1 }).endOf('day');
     const { rows: drivers } = await client.query(
       `SELECT DISTINCT d.driver_id, d.driver_name
          FROM drivers d
-         JOIN on_duty_segments s ON s.driver_id=d.driver_id
-        WHERE s.end_utc > $1 AND s.start_utc < $2`,
-      [start.toISO(), end.toISO()]
+         WHERE EXISTS (
+           SELECT 1 FROM on_duty_segments s 
+           WHERE s.driver_id = d.driver_id 
+           AND s.end_utc > $1 AND s.start_utc < $2
+         ) OR EXISTS (
+           SELECT 1 FROM schedule_predictions sp
+           WHERE sp.driver_id = d.driver_id
+           AND sp.schedule_date >= $3::date AND sp.schedule_date <= $4::date
+         )`,
+      [start.toISO(), actualDataEnd.toISO(), start.toISODate(), end.toISODate()]
     );
     const out = [];
     for (const d of drivers) {
-      const wstart = end.minus({ hours: 168 }).toISO();
-      const wend = end.toISO();
+      // Use actualDataEnd from above for actual work data queries
+      const wstart = actualDataEnd.minus({ hours: 168 }).toISO();
+      const wend = actualDataEnd.toISO();
       // Compute merged (union) intervals inside window, then daily hours and used hours without double counting
       const dailyRes = await client.query(
         `WITH w AS (
