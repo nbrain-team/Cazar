@@ -4,6 +4,9 @@ type GridDriver = {
   driver_id: string;
   driver_name: string;
   day_hours: number[]; // length 7
+  day_schedules?: Record<string, { content: string; hours: number }>; // scheduled shifts
+  projected_hours?: number[]; // projected hours including schedules
+  projected_reasons?: { type: string; severity: string; message: string; day?: string }[]; // schedule-based risks
   total_7d: number;
   hours_used: number;
   hours_available: number;
@@ -97,23 +100,46 @@ export default function Hos607Page() {
               <>
               <tr key={d.driver_id} onClick={() => setOpenRow(prev => prev === d.driver_id ? null : d.driver_id)} style={{ cursor: 'pointer' }}>
                 <td style={{ position: 'sticky', left: 0, backgroundColor: 'var(--card-bg)', zIndex: 1 }}>{d.driver_name} ({d.driver_id})</td>
-                {d.day_hours.map((h, idx) => (
-                  <td key={idx}>
-                    {Number(h || 0) > 0 ? (
-                      <div style={{
-                        padding: '0.25rem 0.5rem',
-                        backgroundColor: Number(h || 0) >= 10 ? 'var(--danger-light)' : Number(h || 0) >= 8 ? 'var(--warning-light)' : 'var(--primary-light)',
-                        borderRadius: 4,
-                        textAlign: 'center',
-                        fontWeight: 600
-                      }}>
-                        {Number(h || 0).toFixed(2)}h
-                      </div>
-                    ) : (
-                      <span style={{ color: '#999' }}>–</span>
-                    )}
-                  </td>
-                ))}
+                {d.day_hours.map((h, idx) => {
+                  const dayLabel = grid?.days?.[idx]?.label;
+                  const schedule = dayLabel && d.day_schedules ? d.day_schedules[dayLabel] : undefined;
+                  const hasSchedule = schedule && schedule.hours > 0;
+                  const isScheduledOnly = Number(h || 0) === 0 && hasSchedule;
+                  
+                  return (
+                    <td key={idx}>
+                      {Number(h || 0) > 0 ? (
+                        <div style={{
+                          padding: '0.25rem 0.5rem',
+                          backgroundColor: Number(h || 0) >= 10 ? 'var(--danger-light)' : Number(h || 0) >= 8 ? 'var(--warning-light)' : 'var(--primary-light)',
+                          borderRadius: 4,
+                          textAlign: 'center',
+                          fontWeight: 600
+                        }}>
+                          {Number(h || 0).toFixed(2)}h
+                        </div>
+                      ) : isScheduledOnly ? (
+                        <div style={{
+                          padding: '0.25rem 0.5rem',
+                          backgroundColor: '#e3f2fd',
+                          border: '1px dashed #2196f3',
+                          borderRadius: 4,
+                          textAlign: 'center',
+                          fontSize: '0.875rem'
+                        }} title={schedule.content}>
+                          <div style={{ fontWeight: 600, color: '#1976d2' }}>
+                            {schedule.hours}h
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {schedule.content}
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#999' }}>–</span>
+                      )}
+                    </td>
+                  );
+                })}
                 {/* Lunch column removed */}
                 <td>
                   {d.status ? (
@@ -144,6 +170,18 @@ export default function Hos607Page() {
                             )) : <li>No window risks</li>}
                           </ul>
                         </div>
+                        {d.projected_reasons && d.projected_reasons.length > 0 && (
+                          <div>
+                            <strong style={{ color: 'var(--warning)' }}>⚠️ Schedule Projection Risks</strong>
+                            <ul style={{ marginTop: '0.5rem' }}>
+                              {d.projected_reasons.map((r, i) => (
+                                <li key={i} style={{ color: 'var(--warning)' }}>
+                                  {r.message}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         <div>
                           <strong>Per-day reasoning</strong>
                           <div style={{ display: 'grid', gap: '0.5rem' }}>

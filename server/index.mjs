@@ -826,6 +826,24 @@ app.get('/api/hos/grid', async (req, res) => {
       const day_hours = dailyRes.rows.map(r => Number(Number(r.hours).toFixed(2)));
       const lunch_total_minutes = Number(Number(lunchTotalRes.rows?.[0]?.minutes || 0).toFixed(0));
       const hours_used_base = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
+      
+      // Get schedule predictions for future days
+      const scheduleRes = await client.query(
+        `SELECT schedule_date, schedule_content, predicted_hours
+         FROM schedule_predictions
+         WHERE driver_id = $1 
+         AND schedule_date >= CURRENT_DATE
+         AND schedule_date <= CURRENT_DATE + INTERVAL '7 days'
+         ORDER BY schedule_date`,
+        [d.driver_id]
+      );
+      const scheduleMap = new Map();
+      scheduleRes.rows.forEach(s => {
+        scheduleMap.set(DateTime.fromISO(s.schedule_date).toISODate(), {
+          content: s.schedule_content,
+          hours: Number(s.predicted_hours)
+        });
+      });
       // Include driver-attested other employer minutes over last 7 days
       const attestRow = await client.query(
         `SELECT other_employer_minutes_last7d
@@ -1016,9 +1034,87 @@ app.get('/api/hos/grid', async (req, res) => {
         }
         day_reasons[label] = reasonsForDay;
       }
+      // Build schedule data for each day
+      const day_schedules = {};
+      const projected_hours = [...day_hours]; // Copy actual hours
+      
+      days.forEach((day, idx) => {
+        const schedule = scheduleMap.get(day.iso);
+        if (schedule) {
+          day_schedules[day.label] = {
+            content: schedule.content,
+            hours: schedule.hours
+          };
+          // If this is a future day with no actual hours yet, use predicted hours
+          if (projected_hours[idx] === 0) {
+            projected_hours[idx] = schedule.hours;
+          }
+        }
+      });
+      
+      // Calculate projected violations with scheduled hours
+      let projected_total = 0;
+      let projected_consec = 0;
+      const projected_reasons = [];
+      
+      // Calculate current state
+      for (let i = 0; i < 7; i++) {
+        if (projected_hours[i] > 0) {
+          projected_total += projected_hours[i];
+          projected_consec++;
+        } else {
+          projected_consec = 0;
+        }
+      }
+      
+      // Check if future scheduled work will cause issues
+      days.forEach((day, idx) => {
+        const schedule = scheduleMap.get(day.iso);
+        if (schedule && DateTime.fromISO(day.iso) >= DateTime.now().startOf('day')) {
+          // This is a future scheduled day
+          const projectedDayTotal = projected_total;
+          
+          // Check 60/7 limit
+          if (projectedDayTotal + schedule.hours > 60) {
+            projected_reasons.push({
+              type: 'PROJECTED_60_7',
+              severity: 'AT_RISK',
+              message: `Scheduled ${day.mmdd}: ${schedule.content} (${schedule.hours}h) would exceed 60h/7d limit`,
+              day: day.label
+            });
+          }
+          
+          // Check consecutive days
+          if (projected_consec >= 4 && schedule.hours > 0) {
+            projected_reasons.push({
+              type: 'PROJECTED_CONSECUTIVE',
+              severity: 'AT_RISK', 
+              message: `Scheduled ${day.mmdd}: Would be ${projected_consec + 1}th consecutive day`,
+              day: day.label
+            });
+          }
+        }
+      });
+      
       detail = window_reasons.map(r => r.message).join('; ');
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
-      out.push({ driver_id: d.driver_id, driver_name: d.driver_name || d.driver_id, day_hours, lunch_total_minutes, total_7d, hours_used, hours_available, status, detail, reasons: window_reasons, window_reasons, day_reasons });
+      out.push({ 
+        driver_id: d.driver_id, 
+        driver_name: d.driver_name || d.driver_id, 
+        day_hours, 
+        day_schedules,
+        projected_hours,
+        projected_reasons,
+        lunch_total_minutes, 
+        total_7d, 
+        hours_used, 
+        hours_available, 
+        status, 
+        detail, 
+        reasons: window_reasons, 
+        window_reasons, 
+        day_reasons 
+      });
     }
     out.sort((a,b)=> a.hours_available - b.hours_available);
     res.json({ window: { start: start.toISODate(), end: end.toISODate() }, days, drivers: out });
