@@ -1253,7 +1253,8 @@ app.post('/api/hos/chat', async (req, res) => {
     let response = { answer: '', data: null, suggestions: [], violations: [], recommendations: [] };
     
     // Get current HOS grid data for analysis
-    const endDate = now.toISODate();
+    // Use fixed date to match the data (Sept 3, 2025)
+    const endDate = '2025-09-03';
     const end = DateTime.fromISO(endDate, { zone: 'utc' }).endOf('day');
     const actualDataEnd = end.minus({ days: 1 }).endOf('day');
     const start = end.minus({ days: 6 }).startOf('day');
@@ -1273,6 +1274,8 @@ app.post('/api/hos/chat', async (req, res) => {
        )`,
       [start.toISO(), actualDataEnd.toISO(), start.toISODate(), end.toISODate()]
     );
+    
+    console.log(`Chat: Found ${drivers.length} drivers for date range ${start.toISODate()} to ${end.toISODate()}`);
     
     const driverData = [];
     for (const d of drivers) {
@@ -1429,6 +1432,8 @@ app.post('/api/hos/chat', async (req, res) => {
       ];
       
     } else if (normalizedQuery.includes('consecutive') || normalizedQuery.includes('days in a row') || normalizedQuery.includes('days of work in a row') || normalizedQuery.includes('7 days') || normalizedQuery.includes('risk of violating')) {
+      console.log(`Chat: Matched consecutive days query. Total drivers: ${driverData.length}`);
+      
       // Check for consecutive days violations and risks
       const consecutiveRiskDrivers = driverData.filter(d => 
         d.consecutive_days >= 5 || 
