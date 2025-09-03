@@ -1204,85 +1204,242 @@ app.post('/api/hos/chat', async (req, res) => {
   
   const client = await pool.connect();
   try {
-    const now = DateTime.utc();
+    const now = DateTime.now().setZone('America/Los_Angeles');
     const normalizedQuery = query.toLowerCase();
     
     // Analyze query type and respond accordingly
-    let response = { answer: '', data: null, suggestions: [] };
+    let response = { answer: '', data: null, suggestions: [], violations: [], recommendations: [] };
     
-    if (normalizedQuery.includes('violation') || normalizedQuery.includes('compliant')) {
-      // Get current violations
-      const { rows: drivers } = await client.query('SELECT DISTINCT driver_id, driver_name FROM drivers WHERE driver_status = $1', ['active']);
+    // Get current HOS grid data for analysis
+    const endDate = now.toISODate();
+    const end = DateTime.fromISO(endDate, { zone: 'utc' }).endOf('day');
+    const actualDataEnd = end.minus({ days: 1 }).endOf('day');
+    const start = end.minus({ days: 6 }).startOf('day');
+    
+    // Build the same driver data as the grid endpoint
+    const { rows: drivers } = await client.query(
+      `SELECT DISTINCT d.driver_id, d.driver_name
+       FROM drivers d
+       WHERE EXISTS (
+         SELECT 1 FROM on_duty_segments s 
+         WHERE s.driver_id = d.driver_id 
+         AND s.end_utc > $1 AND s.start_utc < $2
+       ) OR EXISTS (
+         SELECT 1 FROM schedule_predictions sp
+         WHERE sp.driver_id = d.driver_id
+         AND sp.schedule_date >= $3::date AND sp.schedule_date <= $4::date
+       )`,
+      [start.toISO(), actualDataEnd.toISO(), start.toISODate(), end.toISODate()]
+    );
+    
+    const driverData = [];
+    for (const d of drivers) {
+      const wstart = actualDataEnd.minus({ hours: 168 }).toISO();
+      const wend = actualDataEnd.toISO();
+      
+      // Get hours used
+      const { rows: used } = await client.query(
+        `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (
+           LEAST(end_utc, $2::timestamptz) - GREATEST(start_utc, $1::timestamptz)
+         ))/3600.0), 0) AS hours_used 
+         FROM on_duty_segments 
+         WHERE driver_id = $3 AND end_utc > $1 AND start_utc < $2`,
+        [wstart, wend, d.driver_id]
+      );
+      
+      const hours_used = Number(used[0]?.hours_used || 0);
+      const hours_available = Math.max(0, 60 - hours_used);
+      
+      // Check for violations and at-risk status
+      let status = 'OK';
       const violations = [];
+      const warnings = [];
       
-      for (const driver of drivers) {
-        const { rows: segments } = await client.query(
-          `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
-           FROM on_duty_segments 
-           WHERE driver_id = $1 AND end_utc > $2 
-           ORDER BY start_utc`,
-          [driver.driver_id, now.minus({ days: 8 }).toISO()]
-        );
+      if (hours_available < 0) {
+        status = 'VIOLATION';
+        violations.push({
+          type: 'HOS_60_7',
+          message: `Exceeded 60-hour limit by ${Math.abs(hours_available).toFixed(1)} hours`,
+          severity: 'CRITICAL'
+        });
+      } else if (hours_available < 10) {
+        status = 'AT_RISK';
+        warnings.push({
+          type: 'APPROACHING_LIMIT',
+          message: `Only ${hours_available.toFixed(1)} hours available in 7-day window`,
+          severity: 'HIGH'
+        });
+      }
+      
+      driverData.push({
+        driver_id: d.driver_id,
+        driver_name: d.driver_name,
+        hours_used: hours_used.toFixed(1),
+        hours_available: hours_available.toFixed(1),
+        status,
+        violations,
+        warnings
+      });
+    }
+    
+    // Process different query types
+    if (normalizedQuery.includes('violation') || normalizedQuery.includes('compliant') || normalizedQuery.includes('compliance')) {
+      const violationDrivers = driverData.filter(d => d.status === 'VIOLATION');
+      const atRiskDrivers = driverData.filter(d => d.status === 'AT_RISK');
+      
+      if (violationDrivers.length === 0 && atRiskDrivers.length === 0) {
+        response.answer = '✅ **All drivers are currently compliant with HOS regulations!**\n\nNo violations or at-risk situations detected.';
+      } else {
+        let answer = '';
         
-        const dutySegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
-        const compliance = checkCompliance(dutySegments, now);
-        
-        if (!compliance.compliant) {
-          violations.push({
-            driver,
-            violations: compliance.violations
+        if (violationDrivers.length > 0) {
+          answer += `🚫 **${violationDrivers.length} driver${violationDrivers.length > 1 ? 's' : ''} in violation:**\n\n`;
+          violationDrivers.forEach(d => {
+            answer += `• **${d.driver_name}** - ${d.violations[0].message}\n`;
           });
+        }
+        
+        if (atRiskDrivers.length > 0) {
+          if (answer) answer += '\n';
+          answer += `⚠️ **${atRiskDrivers.length} driver${atRiskDrivers.length > 1 ? 's' : ''} at risk:**\n\n`;
+          atRiskDrivers.forEach(d => {
+            answer += `• **${d.driver_name}** - ${d.warnings[0].message}\n`;
+          });
+        }
+        
+        response.answer = answer;
+        response.violations = violationDrivers;
+      }
+      
+      response.suggestions = [
+        'Which drivers are available to work today?',
+        'Show me drivers who need a break soon',
+        'Who has the most hours available?'
+      ];
+      
+    } else if (normalizedQuery.includes('available') || normalizedQuery.includes('can work') || normalizedQuery.includes('who can drive')) {
+      const availableDrivers = driverData
+        .filter(d => d.status === 'OK' && Number(d.hours_available) > 8)
+        .sort((a, b) => Number(b.hours_available) - Number(a.hours_available));
+      
+      if (availableDrivers.length === 0) {
+        response.answer = '⚠️ **No drivers currently available with sufficient hours.**\n\nAll drivers are either in violation, at risk, or have less than 8 hours available.';
+      } else {
+        response.answer = `✅ **${availableDrivers.length} drivers available to work:**\n\n`;
+        availableDrivers.slice(0, 10).forEach(d => {
+          response.answer += `• **${d.driver_name}** - ${d.hours_available} hours available\n`;
+        });
+        
+        if (availableDrivers.length > 10) {
+          response.answer += `\n_...and ${availableDrivers.length - 10} more drivers available_`;
         }
       }
       
-      response.answer = violations.length === 0 
-        ? 'All drivers are currently compliant with HOS regulations.'
-        : `Found ${violations.length} drivers with HOS violations.`;
-      response.data = violations;
+      response.data = availableDrivers;
       response.suggestions = [
-        'Which drivers are available to work?',
+        'Show me current violations',
+        'Who needs a rest break?',
+        'Which drivers worked the most this week?'
+      ];
+      
+    } else if (normalizedQuery.includes('rule') || normalizedQuery.includes('regulation') || normalizedQuery.includes('60 hour') || normalizedQuery.includes('70 hour')) {
+      // Explain HOS rules
+      response.answer = '📚 **Hours of Service (HOS) Key Rules:**\n\n';
+      
+      if (normalizedQuery.includes('60 hour') || normalizedQuery.includes('60/7')) {
+        response.answer += '**60-Hour/7-Day Rule:**\n';
+        response.answer += '• Drivers cannot drive after 60 hours on duty in 7 consecutive days\n';
+        response.answer += '• This is a rolling calculation that looks back 7 days from now\n';
+        response.answer += '• Exceeding this limit results in an out-of-service order\n\n';
+      }
+      
+      if (normalizedQuery.includes('70 hour') || normalizedQuery.includes('70/8')) {
+        response.answer += '**70-Hour/8-Day Rule:**\n';
+        response.answer += '• Drivers cannot drive after 70 hours on duty in 8 consecutive days\n';
+        response.answer += '• Used by carriers operating 7 days a week\n';
+        response.answer += '• Also a rolling calculation\n\n';
+      }
+      
+      if (normalizedQuery.includes('break') || normalizedQuery.includes('meal') || normalizedQuery.includes('lunch')) {
+        response.answer += '**30-Minute Break Rule:**\n';
+        response.answer += '• Required after 8 hours of driving time\n';
+        response.answer += '• Must be at least 30 consecutive minutes\n';
+        response.answer += '• Can be satisfied by any non-driving period\n\n';
+      }
+      
+      if (!normalizedQuery.includes('60') && !normalizedQuery.includes('70') && !normalizedQuery.includes('break')) {
+        response.answer += '**Common HOS Rules:**\n';
+        response.answer += '• **60/7 Rule:** Max 60 hours on-duty in 7 days\n';
+        response.answer += '• **11-Hour Driving:** Max 11 hours driving after 10 hours off\n';
+        response.answer += '• **14-Hour Duty:** Cannot drive beyond 14th hour after coming on duty\n';
+        response.answer += '• **30-Minute Break:** Required after 8 hours of driving\n';
+        response.answer += '• **34-Hour Restart:** Optional reset of weekly hours\n';
+      }
+      
+      response.suggestions = [
+        'Show me current violations',
+        'Which drivers are near their limits?',
+        'What is the 34-hour restart rule?'
+      ];
+      
+    } else if (normalizedQuery.includes('most hours') || normalizedQuery.includes('worked most') || normalizedQuery.includes('busiest')) {
+      const busyDrivers = driverData
+        .filter(d => Number(d.hours_used) > 0)
+        .sort((a, b) => Number(b.hours_used) - Number(a.hours_used));
+      
+      response.answer = `📊 **Drivers by hours worked (last 7 days):**\n\n`;
+      busyDrivers.slice(0, 10).forEach((d, i) => {
+        const emoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '•';
+        response.answer += `${emoji} **${d.driver_name}** - ${d.hours_used} hours (${d.hours_available} available)\n`;
+      });
+      
+      response.data = busyDrivers;
+      response.suggestions = [
         'Who needs a break soon?',
-        'Predict violations for tomorrow'
+        'Show me violations',
+        'Which drivers are available?'
       ];
-    } else if (normalizedQuery.includes('available') || normalizedQuery.includes('can work')) {
-      // Get available drivers
-      const { rows: drivers } = await client.query('SELECT driver_id, driver_name FROM drivers WHERE driver_status = $1', ['active']);
-      const available = [];
       
-      for (const driver of drivers) {
-        const { rows: segments } = await client.query(
-          `SELECT start_utc, end_utc, 'ON_DUTY_NOT_DRIVING' as status 
-           FROM on_duty_segments 
-           WHERE driver_id = $1 AND end_utc > $2 
-           ORDER BY start_utc`,
-          [driver.driver_id, now.minus({ days: 8 }).toISO()]
-        );
-        
-        const dutySegments = segments.map(s => new DutySegment(s.start_utc, s.end_utc, s.status));
-        const availability = calculateAvailableHours(dutySegments, now);
-        
-        if (availability.canDrive && availability.weeklyHoursAvailable > 8) {
-          available.push({
-            driver,
-            hoursAvailable: availability.weeklyHoursAvailable
-          });
-        }
+    } else if (normalizedQuery.includes('demo') || normalizedQuery.includes('example')) {
+      const demoDrivers = driverData.filter(d => d.driver_id.startsWith('DEMO'));
+      
+      if (demoDrivers.length > 0) {
+        response.answer = '🎯 **Demo/Example Drivers for Testing:**\n\n';
+        demoDrivers.forEach(d => {
+          const statusEmoji = d.status === 'VIOLATION' ? '🚫' : d.status === 'AT_RISK' ? '⚠️' : '✅';
+          response.answer += `${statusEmoji} **${d.driver_name}**\n`;
+          if (d.violations.length > 0) {
+            response.answer += `   └─ ${d.violations[0].message}\n`;
+          } else if (d.warnings.length > 0) {
+            response.answer += `   └─ ${d.warnings[0].message}\n`;
+          } else {
+            response.answer += `   └─ Compliant (${d.hours_available} hours available)\n`;
+          }
+        });
+        response.answer += '\n_These are mock drivers for demonstration purposes_';
       }
       
-      response.answer = `${available.length} drivers are available to work with sufficient hours.`;
-      response.data = available.sort((a, b) => b.hoursAvailable - a.hoursAvailable);
       response.suggestions = [
-        'Show drivers with violations',
-        'Who needs rest tomorrow?',
-        'Optimize tomorrow\'s schedule'
+        'Show all violations',
+        'Explain the 60-hour rule',
+        'Which real drivers are available?'
       ];
+      
     } else {
-      response.answer = 'I can help you with HOS compliance, violations, driver availability, and scheduling. What would you like to know?';
+      // Default response with helpful information
+      response.answer = '🚛 **HOS Compliance Assistant**\n\nI can help you with:\n\n';
+      response.answer += '• **Compliance Status** - Check violations and at-risk drivers\n';
+      response.answer += '• **Driver Availability** - Find who can work\n';
+      response.answer += '• **HOS Rules** - Explain regulations\n';
+      response.answer += '• **Work History** - See who worked the most\n';
+      response.answer += '• **Predictions** - Forecast future violations\n\n';
+      response.answer += 'What would you like to know?';
+      
       response.suggestions = [
         'Show current HOS violations',
         'Which drivers are available?',
-        'Predict violations for next week',
-        'Who needs a 34-hour restart?'
+        'Explain the 60-hour rule',
+        'Who worked the most this week?'
       ];
     }
     
