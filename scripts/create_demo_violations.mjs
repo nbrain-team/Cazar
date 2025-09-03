@@ -60,7 +60,8 @@ async function createDemoViolations() {
     }
     
     const tz = 'America/Los_Angeles';
-    const now = DateTime.now().setZone(tz);
+    // Use September 3, 2024 as "today" to match the current data
+    const now = DateTime.fromISO('2024-09-03', { zone: tz });
     
     // Scenario 1: Driver exceeding 60 hours in 7 days
     console.log('Creating Scenario 1: 60/7 hour violation...');
