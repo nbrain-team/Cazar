@@ -1100,15 +1100,6 @@ app.get('/api/hos/grid', async (req, res) => {
         }
       });
       
-      // Build schedule data for grid display
-      const day_schedules = {};
-      days.forEach(day => {
-        const schedule = scheduleMap.get(day.iso);
-        if (schedule) {
-          day_schedules[day.label] = schedule;
-        }
-      });
-      
       detail = window_reasons.map(r => r.message).join('; ');
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
       out.push({ 
