@@ -690,8 +690,9 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
           // Only if within the same local calendar day
           if (!nextStart.hasSame(endAdj, 'day')) break;
           const gapMin = Math.floor(nextStart.diff(endAdj, 'minutes').minutes);
-          // If gap is less than 60 minutes, treat as lunch break
-          if (gapMin > 0 && gapMin < 60) {
+          // If gap is between 0 and 180 minutes (3 hours), treat as potential lunch break
+          // This captures both short breaks and longer lunch periods
+          if (gapMin > 0 && gapMin <= 180) {
             const infStartUtc = endUtc;
             const infEndUtc = nextStart.toUTC();
             if (infEndUtc > infStartUtc) {
@@ -707,7 +708,7 @@ app.post('/api/hos/import-timecards', upload.single('file'), async (req, res) =>
                 await client.query(
                   `INSERT INTO break_segments (driver_id, upload_id, label, start_utc, end_utc, source_row_ref)
                    VALUES ($1, $2, 'Lunch', $3, $4, $5)`,
-                  [driverId, uploadId, infStartUtc.toISO(), infEndUtc.toISO(), JSON.stringify({ inferred: true, reason: 'gap_less_than_60min', from_line: li, to_line: j, gap_minutes: gapMin })]
+                  [driverId, uploadId, infStartUtc.toISO(), infEndUtc.toISO(), JSON.stringify({ inferred: true, reason: 'gap_within_3_hours', from_line: li, to_line: j, gap_minutes: gapMin })]
                 );
               }
             }
