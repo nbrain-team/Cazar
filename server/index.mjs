@@ -827,15 +827,15 @@ app.get('/api/hos/grid', async (req, res) => {
       const lunch_total_minutes = Number(Number(lunchTotalRes.rows?.[0]?.minutes || 0).toFixed(0));
       const hours_used_base = Number(Number(usedRes.rows?.[0]?.hours_used || 0).toFixed(2));
       
-      // Get schedule predictions for future days
+      // Get schedule predictions for the grid date range
       const scheduleRes = await client.query(
         `SELECT schedule_date, schedule_content, predicted_hours
          FROM schedule_predictions
          WHERE driver_id = $1 
-         AND schedule_date >= CURRENT_DATE
-         AND schedule_date <= CURRENT_DATE + INTERVAL '7 days'
+         AND schedule_date >= $2::date - INTERVAL '7 days'
+         AND schedule_date <= $2::date + INTERVAL '7 days'
          ORDER BY schedule_date`,
-        [d.driver_id]
+        [d.driver_id, end.toISODate()]
       );
       const scheduleMap = new Map();
       scheduleRes.rows.forEach(s => {
@@ -1097,6 +1097,15 @@ app.get('/api/hos/grid', async (req, res) => {
               day: day.label
             });
           }
+        }
+      });
+      
+      // Build schedule data for grid display
+      const day_schedules = {};
+      days.forEach(day => {
+        const schedule = scheduleMap.get(day.iso);
+        if (schedule) {
+          day_schedules[day.label] = schedule;
         }
       });
       
