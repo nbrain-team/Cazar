@@ -975,14 +975,15 @@ app.get('/api/hos/grid', async (req, res) => {
                     COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0),0) AS break_minutes,
                     COALESCE(MAX(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS qual_meal_exists,
                     MIN(CASE WHEN EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN br.start_utc END) AS earliest_qual_meal_start,
-                    COALESCE(MAX(CASE WHEN (br.source_row_ref ->> 'inferred') = 'true' AND EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS inferred_meal_exists
+                    COALESCE(MAX(CASE WHEN (br.source_row_ref ->> 'inferred') = 'true' AND EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0 >= $4 THEN 1 ELSE 0 END),0) AS inferred_meal_exists,
+                    COALESCE(MAX(EXTRACT(EPOCH FROM (LEAST(br.end_utc, b.day_end_utc) - GREATEST(br.start_utc, b.day_start_utc)))/60.0),0) AS longest_break_minutes
                FROM bounds b
                LEFT JOIN break_segments br ON br.driver_id=$3 AND br.end_utc > b.day_start_utc AND br.start_utc < b.day_end_utc
               GROUP BY b.day_start_utc, b.day_end_utc
            ),
            combined AS (
              SELECT b.day_start_utc, b.day_end_utc, od.on_hours, od.first_start_utc, od.last_end_utc,
-                    br.break_minutes, br.qual_meal_exists, br.earliest_qual_meal_start, br.inferred_meal_exists
+                    br.break_minutes, br.qual_meal_exists, br.earliest_qual_meal_start, br.inferred_meal_exists, br.longest_break_minutes
                FROM bounds b
                LEFT JOIN onday od ON od.day_start_utc=b.day_start_utc AND od.day_end_utc=b.day_end_utc
                LEFT JOIN brks br ON br.day_start_utc=b.day_start_utc AND br.day_end_utc=b.day_end_utc
@@ -995,6 +996,7 @@ app.get('/api/hos/grid', async (req, res) => {
                   qual_meal_exists,
                   earliest_qual_meal_start,
                   inferred_meal_exists,
+                  longest_break_minutes,
                   EXTRACT(EPOCH FROM (first_start_utc - LAG(last_end_utc) OVER (ORDER BY day_start_utc)))/3600.0 AS rest_before_hours
              FROM combined
             ORDER BY day_start_utc;`,
@@ -1026,8 +1028,16 @@ app.get('/api/hos/grid', async (req, res) => {
           
           // Only flag a violation if there's no qualifying meal at all
           if (!qual) {
-            // No qualifying meal exists
-            reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
+            const longestBreak = Number(r.longest_break_minutes || 0);
+            let message;
+            if (longestBreak > 0) {
+              // They took a break but it was too short
+              message = `Meal break violation: Only took ${Math.round(longestBreak)}min break (need ≥${meal_min_minutes}min)`;
+            } else {
+              // No break at all
+              message = `Meal break violation: No break taken (need ≥${meal_min_minutes}min by 6h on-duty)`;
+            }
+            reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null, longest_break_minutes: longestBreak } });
           }
           // If a qualifying meal exists (even if taken after 6 hours), they are compliant - no message needed
         }
