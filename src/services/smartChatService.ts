@@ -64,6 +64,31 @@ export class SmartChatService {
   static async ask(query: string, opts?: SmartChatOptions): Promise<string> {
     const q = query.toLowerCase();
 
+    // Check if this is an HOS-related query
+    const hosKeywords = [
+      'hos', 'hours of service', 'consecutive', 'days in a row', 
+      '60 hour', '70 hour', '60/7', '70/8', 'violation', 
+      'meal break', 'lunch break', 'rest break', 'driver', 
+      'at risk', 'compliance', 'dot', 'fmcsa'
+    ];
+    
+    const isHosQuery = hosKeywords.some(keyword => q.includes(keyword));
+    
+    if (isHosQuery) {
+      // Redirect to HOS chat API
+      try {
+        const resp = await fetch('/api/hos/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await resp.json();
+        if (data?.answer) return data.answer;
+      } catch (e) {
+        console.error('HOS chat API error:', e);
+      }
+    }
+
     const isDataDirective = q.trim().startsWith('data:');
 
     // Prefer RAG for everything except explicit data: directive
