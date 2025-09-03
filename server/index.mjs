@@ -1106,6 +1106,11 @@ app.get('/api/hos/grid', async (req, res) => {
         }
       });
       
+      // Update status if there are projected risks
+      if (projected_reasons.length > 0 && status === 'OK') {
+        status = 'AT_RISK';
+      }
+      
       detail = window_reasons.map(r => r.message).join('; ');
       const total_7d = Number(day_hours.reduce((a,b)=>a + (b||0), 0).toFixed(2));
       out.push({ 
