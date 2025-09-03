@@ -1300,13 +1300,12 @@ app.post('/api/hos/chat', async (req, res) => {
             SUM(EXTRACT(EPOCH FROM (end_utc - start_utc))/3600.0) as hours
           FROM on_duty_segments
           WHERE driver_id = $1 
-            AND DATE(timezone('America/Los_Angeles', start_utc)) >= CURRENT_DATE - INTERVAL '7 days'
-            AND DATE(timezone('America/Los_Angeles', start_utc)) <= CURRENT_DATE
+            AND start_utc >= $2 AND start_utc <= $3
           GROUP BY DATE(timezone('America/Los_Angeles', start_utc))
           ORDER BY work_date DESC
         )
         SELECT * FROM daily_hours`,
-        [d.driver_id]
+        [d.driver_id, start.toISO(), actualDataEnd.toISO()]
       );
       
       // Count consecutive days worked
@@ -1429,7 +1428,7 @@ app.post('/api/hos/chat', async (req, res) => {
         'Which drivers worked the most this week?'
       ];
       
-    } else if (normalizedQuery.includes('consecutive') || normalizedQuery.includes('days in a row') || normalizedQuery.includes('7 days') || normalizedQuery.includes('risk of violating')) {
+    } else if (normalizedQuery.includes('consecutive') || normalizedQuery.includes('days in a row') || normalizedQuery.includes('days of work in a row') || normalizedQuery.includes('7 days') || normalizedQuery.includes('risk of violating')) {
       // Check for consecutive days violations and risks
       const consecutiveRiskDrivers = driverData.filter(d => 
         d.consecutive_days >= 5 || 
