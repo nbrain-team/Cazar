@@ -1115,6 +1115,31 @@ app.get('/api/hos/grid', async (req, res) => {
         }
       });
       
+      // Check day_reasons for any violations
+      let hasViolationInDays = false;
+      let hasAtRiskInDays = false;
+      for (const day in day_reasons) {
+        const dayReasons = day_reasons[day];
+        if (dayReasons.some(r => r.severity === 'VIOLATION')) {
+          hasViolationInDays = true;
+          // Add the violation to window_reasons so it shows in the summary
+          const violation = dayReasons.find(r => r.severity === 'VIOLATION');
+          if (violation && !window_reasons.some(wr => wr.type === violation.type)) {
+            window_reasons.push(violation);
+          }
+        }
+        if (dayReasons.some(r => r.severity === 'AT_RISK')) {
+          hasAtRiskInDays = true;
+        }
+      }
+      
+      // Update status based on all violations
+      if (hasViolationInDays && status !== 'VIOLATION') {
+        status = 'VIOLATION';
+      } else if (hasAtRiskInDays && status === 'OK') {
+        status = 'AT_RISK';
+      }
+      
       // Update status if there are projected risks
       if (projected_reasons.length > 0 && status === 'OK') {
         status = 'AT_RISK';
