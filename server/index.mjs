@@ -779,8 +779,8 @@ app.get('/api/hos/grid', async (req, res) => {
           ),
           bounds AS (
             SELECT day_local,
-                   (day_local AT TIME ZONE 'America/Los_Angeles') AS day_start_utc,
-                   ((day_local + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS day_end_utc
+                   timezone('UTC', timezone('America/Los_Angeles', day_local::timestamp)) AS day_start_utc,
+                   timezone('UTC', timezone('America/Los_Angeles', (day_local + interval '1 day')::timestamp)) AS day_end_utc
               FROM days_local
           )
           SELECT to_char(day_start_utc, 'YYYY-MM-DD') AS day,
@@ -864,8 +864,8 @@ app.get('/api/hos/grid', async (req, res) => {
       // Evaluate meal in window (most recent local day): look for any break >= 30m occurring by 6th hour of on-duty
       const mealOkRow = await client.query(
         `WITH day_bounds AS (
-           SELECT date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles' AS s,
-                  (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day') AT TIME ZONE 'America/Los_Angeles' AS e
+           SELECT timezone('UTC', timezone('America/Los_Angeles', date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz))::timestamp)) AS s,
+                  timezone('UTC', timezone('America/Los_Angeles', (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day')::timestamp)) AS e
          ), onday AS (
            SELECT * FROM on_duty_segments, day_bounds db WHERE driver_id=$1 AND end_utc > db.s AND start_utc < db.e
          ), accum AS (
@@ -884,8 +884,8 @@ app.get('/api/hos/grid', async (req, res) => {
       // Short rest: rest between last end on prior day and first start today
       const restRow = await client.query(
         `WITH bounds AS (
-           SELECT (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles') AS s,
-                  ((date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS e
+           SELECT timezone('UTC', timezone('America/Los_Angeles', date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz))::timestamp)) AS s,
+                  timezone('UTC', timezone('America/Los_Angeles', (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day')::timestamp)) AS e
          ), segs AS (
            SELECT start_utc, end_utc FROM on_duty_segments, bounds b WHERE driver_id=$1 AND end_utc > b.s - interval '1 day' AND start_utc < b.e
          ), prior AS (
@@ -901,8 +901,8 @@ app.get('/api/hos/grid', async (req, res) => {
       // Daily max: sum on-duty hours for the most recent local day
       const dailyRow = await client.query(
         `WITH b AS (
-           SELECT date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) AT TIME ZONE 'America/Los_Angeles' AS s,
-                  (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day') AT TIME ZONE 'America/Los_Angeles' AS e
+           SELECT timezone('UTC', timezone('America/Los_Angeles', date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz))::timestamp)) AS s,
+                  timezone('UTC', timezone('America/Los_Angeles', (date_trunc('day', timezone('America/Los_Angeles', $2::timestamptz)) + interval '1 day')::timestamp)) AS e
          )
          SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(s.end_utc, b.e) - GREATEST(s.start_utc, b.s)))/3600.0),0) AS daily_hours
            FROM on_duty_segments s, b
@@ -943,8 +943,8 @@ app.get('/api/hos/grid', async (req, res) => {
            ),
            bounds AS (
              SELECT day_local,
-                    (day_local AT TIME ZONE 'America/Los_Angeles') AS day_start_utc,
-                    ((day_local + interval '1 day') AT TIME ZONE 'America/Los_Angeles') AS day_end_utc
+                    timezone('UTC', timezone('America/Los_Angeles', day_local::timestamp)) AS day_start_utc,
+                    timezone('UTC', timezone('America/Los_Angeles', (day_local + interval '1 day')::timestamp)) AS day_end_utc
                FROM days_local
            ),
            onday AS (
