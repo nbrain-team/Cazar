@@ -96,23 +96,44 @@ export class HOSChatService {
     violations?: HOSViolation[];
     recommendations?: HOSRecommendation[];
   }> {
-    const normalizedQuery = query.toLowerCase();
-    
-    // Determine query intent
-    if (this.isViolationQuery(normalizedQuery)) {
-      return await this.handleViolationQuery(normalizedQuery);
-    } else if (this.isDriverStatusQuery(normalizedQuery)) {
-      return await this.handleDriverStatusQuery(normalizedQuery);
-    } else if (this.isSchedulingQuery(normalizedQuery)) {
-      return await this.handleSchedulingQuery(normalizedQuery);
-    } else if (this.isRegulationQuery(normalizedQuery)) {
-      return this.handleRegulationQuery(normalizedQuery);
-    } else if (this.isAvailabilityQuery(normalizedQuery)) {
-      return await this.handleAvailabilityQuery(normalizedQuery);
-    } else if (this.isPredictionQuery(normalizedQuery)) {
-      return await this.handlePredictionQuery(normalizedQuery);
-    } else {
-      return this.handleGeneralQuery(normalizedQuery);
+    try {
+      // Call the backend API endpoint
+      const response = await fetch('/api/hos/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error calling HOS chat API:', error);
+      
+      // Fallback to local processing if API fails
+      const normalizedQuery = query.toLowerCase();
+      
+      // Determine query intent
+      if (this.isViolationQuery(normalizedQuery)) {
+        return await this.handleViolationQuery(normalizedQuery);
+      } else if (this.isDriverStatusQuery(normalizedQuery)) {
+        return await this.handleDriverStatusQuery(normalizedQuery);
+      } else if (this.isSchedulingQuery(normalizedQuery)) {
+        return await this.handleSchedulingQuery(normalizedQuery);
+      } else if (this.isRegulationQuery(normalizedQuery)) {
+        return this.handleRegulationQuery(normalizedQuery);
+      } else if (this.isAvailabilityQuery(normalizedQuery)) {
+        return await this.handleAvailabilityQuery(normalizedQuery);
+      } else if (this.isPredictionQuery(normalizedQuery)) {
+        return await this.handlePredictionQuery(normalizedQuery);
+      } else {
+        return this.handleGeneralQuery(normalizedQuery);
+      }
     }
   }
 
