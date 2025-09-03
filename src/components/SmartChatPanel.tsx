@@ -64,7 +64,17 @@ export function SmartChatPanel({ open, onClose }: SmartChatPanelProps) {
     setMessages(prev => [...prev, thinkingMsg]);
     
     try {
+      // Ensure minimum thinking time for better UX
+      const startTime = Date.now();
       const answer = await SmartChatService.ask(trimmed, { explain: false });
+      const elapsed = Date.now() - startTime;
+      
+      // Show thinking for at least 800ms
+      if (elapsed < 800) {
+        await new Promise(resolve => setTimeout(resolve, 800 - elapsed));
+      }
+      
+      console.log('Chat response:', answer); // Debug log
       // Remove thinking message and add real answer
       setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', text: answer }]);
     } catch (error) {

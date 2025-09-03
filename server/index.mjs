@@ -1377,26 +1377,67 @@ app.post('/api/hos/chat', async (req, res) => {
       const atRiskDrivers = driverData.filter(d => d.status === 'AT_RISK');
       
       if (violationDrivers.length === 0 && atRiskDrivers.length === 0) {
-        response.answer = '✅ **All drivers are currently compliant with HOS regulations!**\n\nNo violations or at-risk situations detected.';
+        response.answer = '# ✅ Full Compliance\n\n**All drivers are currently compliant with HOS regulations!**\n\nNo violations or at-risk situations detected.';
       } else {
-        let answer = '';
+        response.answer = `# 📊 HOS Compliance Status\n\n`;
+        response.answer += `**${violationDrivers.length + atRiskDrivers.length} drivers** requiring attention\n\n`;
+        response.answer += `---\n\n`;
         
         if (violationDrivers.length > 0) {
-          answer += `🚫 **${violationDrivers.length} driver${violationDrivers.length > 1 ? 's' : ''} in violation:**\n\n`;
+          response.answer += `## 🚫 VIOLATIONS (${violationDrivers.length} drivers)\n\n`;
+          response.answer += `> **Immediate action required** - These drivers cannot drive\n\n`;
+          
+          // Group by violation type
+          const byType = {};
           violationDrivers.forEach(d => {
-            answer += `• **${d.driver_name}** - ${d.violations[0].message}\n`;
+            d.violations.forEach(v => {
+              const type = v.type || 'OTHER';
+              if (!byType[type]) byType[type] = [];
+              byType[type].push({ driver: d, violation: v });
+            });
           });
+          
+          Object.entries(byType).forEach(([type, items]) => {
+            const typeLabel = {
+              'WEEKLY_HOURS': '60/7 Hour Violations',
+              'MEAL': 'Meal Break Violations',
+              'CONSECUTIVE_DAYS': 'Consecutive Days Violations',
+              'DAILY_DRIVING': 'Daily Driving Violations',
+              'DAILY_DUTY': 'Daily Duty Violations'
+            }[type] || 'Other Violations';
+            
+            response.answer += `### ${typeLabel}\n`;
+            items.forEach(({ driver, violation }) => {
+              response.answer += `- **${driver.driver_name}**: ${violation.message}\n`;
+            });
+            response.answer += `\n`;
+          });
+          
+          response.answer += `---\n\n`;
         }
         
         if (atRiskDrivers.length > 0) {
-          if (answer) answer += '\n';
-          answer += `⚠️ **${atRiskDrivers.length} driver${atRiskDrivers.length > 1 ? 's' : ''} at risk:**\n\n`;
+          response.answer += `## ⚠️ AT RISK (${atRiskDrivers.length} drivers)\n\n`;
+          response.answer += `> **Proactive action needed** - Schedule adjustments recommended\n\n`;
+          
           atRiskDrivers.forEach(d => {
-            answer += `• **${d.driver_name}** - ${d.warnings[0].message}\n`;
+            response.answer += `### ${d.driver_name}\n`;
+            response.answer += `- **Warning:** ${d.warnings[0].message}\n`;
+            response.answer += `- **Hours Available:** ${d.hours_available}\n\n`;
           });
         }
         
-        response.answer = answer;
+        response.answer += `---\n\n`;
+        response.answer += `## 💡 Recommended Actions\n\n`;
+        if (violationDrivers.length > 0) {
+          response.answer += `1. **Violations:** Remove affected drivers from schedule immediately\n`;
+          response.answer += `2. **Compliance:** Ensure required rest/break periods are taken\n`;
+        }
+        if (atRiskDrivers.length > 0) {
+          response.answer += `${violationDrivers.length > 0 ? '3' : '1'}. **Prevention:** Adjust schedules for at-risk drivers\n`;
+          response.answer += `${violationDrivers.length > 0 ? '4' : '2'}. **Monitoring:** Track these drivers closely today\n`;
+        }
+        
         response.violations = violationDrivers;
       }
       
