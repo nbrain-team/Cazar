@@ -1065,16 +1065,15 @@ app.get('/api/hos/grid', async (req, res) => {
       // Calculate projected violations with scheduled hours
       const projected_reasons = [];
       
-      // Calculate consecutive days for projection
+      // Calculate current consecutive days streak (counting backwards from today)
       let projected_consec = 0;
-      let found_break = false;
       
-      // Count consecutive days backwards from most recent day with hours
+      // Start from the most recent day and count backwards
       for (let i = 6; i >= 0; i--) {
-        if (projected_hours[i] > 0 && !found_break) {
+        if (projected_hours[i] > 0) {
           projected_consec++;
-        } else if (projected_hours[i] === 0 && projected_consec > 0) {
-          found_break = true;
+        } else {
+          // Found a day off, streak is broken
           break;
         }
       }
