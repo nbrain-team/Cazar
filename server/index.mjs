@@ -839,7 +839,11 @@ app.get('/api/hos/grid', async (req, res) => {
       );
       const scheduleMap = new Map();
       scheduleRes.rows.forEach(s => {
-        scheduleMap.set(DateTime.fromISO(s.schedule_date).toISODate(), {
+        // Ensure consistent date format (YYYY-MM-DD)
+        const scheduleDate = s.schedule_date instanceof Date 
+          ? DateTime.fromJSDate(s.schedule_date).toISODate()
+          : DateTime.fromISO(s.schedule_date.split('T')[0]).toISODate();
+        scheduleMap.set(scheduleDate, {
           content: s.schedule_content,
           hours: Number(s.predicted_hours)
         });
@@ -1014,15 +1018,8 @@ app.get('/api/hos/grid', async (req, res) => {
           if (!qual) {
             // No qualifying meal exists
             reasonsForDay.push({ type: 'MEAL', severity: 'VIOLATION', message: `No ≥${meal_min_minutes}m meal by 6h on-duty`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
-          } else if (qual && !mealBy6Ok) {
-            // Meal exists but was taken after 6 hours
-            if (inferred) {
-              // Looks like lunch taken but mis-typed and taken late
-              reasonsForDay.push({ type: 'DRIVER_LOG_ERROR', severity: 'NOTICE', message: 'Lunch taken late (after 6h) and not logged as LP', values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
-            } else {
-              reasonsForDay.push({ type: 'MEAL_LATE', severity: 'AT_RISK', message: `Meal taken late (after 6h on-duty)`, values: { first_start_utc: r.first_start_utc || null, earliest_meal_utc: r.earliest_qual_meal_start || null } });
-            }
           }
+          // If a qualifying meal exists (even if taken after 6 hours), they are compliant - no message needed
         }
         // Short rest before day (only matters if there is a worked shift on this day)
         if (workedFlags[i] && restBefore > 0 && restBefore < min_rest_hours_between_shifts) {
