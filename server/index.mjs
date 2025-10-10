@@ -2094,19 +2094,9 @@ async function searchPostgres(query, pool) {
   }
 }
 
-// Helper: Search Microsoft Graph API (placeholder - needs authentication flow)
-async function searchMicrosoft(query, accessToken) {
-  // This would require Microsoft Graph API authentication
-  // For now, return placeholder indicating this needs setup
-  return [];
-}
-
-// Helper: Search ADP API (placeholder - needs certificate authentication)
-async function searchADP(query) {
-  // This would require ADP API authentication with certificate
-  // For now, return placeholder indicating this needs setup
-  return [];
-}
+// Import Microsoft and ADP services
+import { searchMicrosoft365 } from './lib/microsoftGraph.mjs';
+import { searchADP as searchADPService } from './lib/adpService.mjs';
 
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
@@ -2164,22 +2154,66 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       }
     }
     
-    // Search Microsoft 365 if enabled (placeholder)
+    // Search Microsoft 365 if enabled
     if (enabledDatabases.includes('microsoft')) {
-      sources.push({
-        type: 'microsoft',
-        title: 'Microsoft 365 Integration',
-        snippet: 'Microsoft Graph API integration pending - requires authentication setup'
-      });
+      try {
+        const msResults = await searchMicrosoft365(message);
+        msResults.forEach(r => {
+          contextSources.push(`[Microsoft 365 - ${r.type}] ${r.title}: ${r.snippet}`);
+          sources.push({
+            type: 'microsoft',
+            title: `${r.type.toUpperCase()}: ${r.title}`,
+            snippet: r.snippet,
+            url: r.url
+          });
+        });
+        
+        if (msResults.length === 0) {
+          // Add info message if no results but API is working
+          sources.push({
+            type: 'microsoft',
+            title: 'Microsoft 365',
+            snippet: 'Connected - No matching results found for this query'
+          });
+        }
+      } catch (error) {
+        console.error('Microsoft 365 search error:', error);
+        sources.push({
+          type: 'microsoft',
+          title: 'Microsoft 365 Connection',
+          snippet: `Authentication configured. ${error.message.includes('consent') ? 'Admin consent required in Azure Portal.' : 'API error - check logs.'}`
+        });
+      }
     }
     
-    // Search ADP if enabled (placeholder)
+    // Search ADP if enabled
     if (enabledDatabases.includes('adp')) {
-      sources.push({
-        type: 'adp',
-        title: 'ADP Payroll Integration',
-        snippet: 'ADP API integration pending - requires certificate authentication'
-      });
+      try {
+        const adpResults = await searchADPService(message);
+        adpResults.forEach(r => {
+          contextSources.push(`[ADP - ${r.type}] ${r.title}: ${r.snippet}`);
+          sources.push({
+            type: 'adp',
+            title: r.title,
+            snippet: r.snippet
+          });
+        });
+        
+        if (adpResults.length === 0) {
+          sources.push({
+            type: 'adp',
+            title: 'ADP Payroll',
+            snippet: 'Connected - No matching results found for this query'
+          });
+        }
+      } catch (error) {
+        console.error('ADP search error:', error);
+        sources.push({
+          type: 'adp',
+          title: 'ADP Connection',
+          snippet: `Certificate authentication configured. ${error.message}`
+        });
+      }
     }
     
     // Build conversation context
