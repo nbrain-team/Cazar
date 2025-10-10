@@ -1123,9 +1123,8 @@ app.get('/api/hos/grid', async (req, res) => {
         }
       });
       
-      // Check day_reasons for any violations
+      // Check day_reasons for any violations and targeted AT_RISK on current day only
       let hasViolationInDays = false;
-      let hasAtRiskInDays = false;
       for (const day in day_reasons) {
         const dayReasons = day_reasons[day];
         if (dayReasons.some(r => r.severity === 'VIOLATION')) {
@@ -1136,19 +1135,24 @@ app.get('/api/hos/grid', async (req, res) => {
             window_reasons.push(violation);
           }
         }
-        if (dayReasons.some(r => r.severity === 'AT_RISK')) {
-          hasAtRiskInDays = true;
+      }
+      
+      // Update status based on violations across the window
+      if (hasViolationInDays && status !== 'VIOLATION') {
+        status = 'VIOLATION';
+      }
+      
+      // Only treat consecutive-days AT_RISK if it applies to the current day (resets after a day off)
+      if (status === 'OK') {
+        const currentLabel = days[days.length - 1]?.label || 'D';
+        const currentDayReasons = day_reasons[currentLabel] || [];
+        const atRiskConsecutiveToday = currentDayReasons.some(r => r.type === 'CONSECUTIVE_DAYS' && r.severity === 'AT_RISK');
+        if (atRiskConsecutiveToday) {
+          status = 'AT_RISK';
         }
       }
       
-      // Update status based on all violations
-      if (hasViolationInDays && status !== 'VIOLATION') {
-        status = 'VIOLATION';
-      } else if (hasAtRiskInDays && status === 'OK') {
-        status = 'AT_RISK';
-      }
-      
-      // Update status if there are projected risks
+      // Update status if there are projected risks (future schedule)
       if (projected_reasons.length > 0 && status === 'OK') {
         status = 'AT_RISK';
       }
@@ -1295,19 +1299,32 @@ app.post('/api/hos/chat', async (req, res) => {
       const hours_used = Number(used[0]?.hours_used || 0);
       const hours_available = Math.max(0, 60 - hours_used);
       
-      // Get daily work history to check consecutive days
+      // Get daily work history to check consecutive days, including days with zero hours
       const { rows: dailyWork } = await client.query(
-        `WITH daily_hours AS (
-          SELECT 
-            DATE(timezone('America/Los_Angeles', start_utc)) as work_date,
-            SUM(EXTRACT(EPOCH FROM (end_utc - start_utc))/3600.0) as hours
-          FROM on_duty_segments
-          WHERE driver_id = $1 
-            AND start_utc >= $2 AND start_utc <= $3
-          GROUP BY DATE(timezone('America/Los_Angeles', start_utc))
-          ORDER BY work_date DESC
-        )
-        SELECT * FROM daily_hours`,
+        `WITH w AS (
+           SELECT $2::timestamptz AS wstart, $3::timestamptz AS wend
+         ), days_local AS (
+           SELECT generate_series(
+                    date_trunc('day', timezone('America/Los_Angeles', (SELECT wstart FROM w))),
+                    date_trunc('day', timezone('America/Los_Angeles', (SELECT wend FROM w))),
+                    interval '1 day') AS day_local
+         ), bounds AS (
+           SELECT day_local,
+                  timezone('UTC', timezone('America/Los_Angeles', day_local::timestamp)) AS day_start_utc,
+                  timezone('UTC', timezone('America/Los_Angeles', (day_local + interval '1 day')::timestamp)) AS day_end_utc
+             FROM days_local
+         ), daily AS (
+           SELECT to_char(b.day_start_utc, 'YYYY-MM-DD') AS work_date,
+                  COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(s.end_utc, b.day_end_utc) - GREATEST(s.start_utc, b.day_start_utc)))/3600.0),0) AS hours
+             FROM bounds b
+             LEFT JOIN on_duty_segments s
+               ON s.driver_id = $1
+              AND s.end_utc > b.day_start_utc
+              AND s.start_utc < b.day_end_utc
+            GROUP BY work_date, b.day_start_utc
+            ORDER BY b.day_start_utc DESC
+         )
+         SELECT work_date, hours FROM daily ORDER BY work_date DESC;`,
         [d.driver_id, start.toISO(), actualDataEnd.toISO()]
       );
       
@@ -1342,15 +1359,15 @@ app.post('/api/hos/chat', async (req, res) => {
         });
       }
       
-      // Check consecutive days
-      if (consecutiveDays >= 7) {
+      // Check consecutive days (5th = AT_RISK, 6th+ = VIOLATION)
+      if (consecutiveDays >= 6) {
         status = 'VIOLATION';
         violations.push({
           type: 'CONSECUTIVE_DAYS',
-          message: `Working ${consecutiveDays} consecutive days (7+ is a violation)`,
+          message: `Working ${consecutiveDays} consecutive days (6+ is a violation)`,
           severity: 'CRITICAL'
         });
-      } else if (consecutiveDays >= 5) {
+      } else if (consecutiveDays === 5) {
         if (status === 'OK') status = 'AT_RISK';
         warnings.push({
           type: 'CONSECUTIVE_DAYS',
@@ -1975,6 +1992,268 @@ app.post('/api/hos/report/generate', async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+// =============================
+// Smart Agent RAG/MCP Endpoint
+// =============================
+
+// Compliance URLs Configuration (stored in-memory for now, could be moved to DB)
+let complianceUrls = [
+  { url: 'https://www.fmcsa.dot.gov/regulations/hours-of-service', category: 'HOS Regulations', enabled: true },
+  { url: 'https://www.osha.gov/', category: 'OSHA Safety', enabled: true },
+  { url: 'https://www.dol.gov/agencies/whd', category: 'DOL Wage & Hour', enabled: true }
+];
+
+// Helper: Search web via SERP API
+async function searchWeb(query, complianceOnly = false) {
+  try {
+    const serpApiKey = process.env.SERP_API_KEY;
+    if (!serpApiKey) return [];
+    
+    let searchQuery = query;
+    if (complianceOnly) {
+      const enabledUrls = complianceUrls.filter(u => u.enabled);
+      if (enabledUrls.length > 0) {
+        const sitesQuery = enabledUrls.map(u => `site:${new URL(u.url).hostname}`).join(' OR ');
+        searchQuery = `(${sitesQuery}) ${query}`;
+      }
+    }
+    
+    const response = await fetch(`https://serpapi.com/search?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${serpApiKey}&num=5`);
+    if (!response.ok) throw new Error('SERP API failed');
+    
+    const data = await response.json();
+    return (data.organic_results || []).slice(0, 5).map(r => ({
+      type: 'web',
+      title: r.title,
+      url: r.link,
+      snippet: r.snippet
+    }));
+  } catch (error) {
+    console.error('Web search error:', error);
+    return [];
+  }
+}
+
+// Helper: Search Pinecone vector DB
+async function searchPinecone(query, topK = 5) {
+  try {
+    const embed = await openai.embeddings.create({ model: 'text-embedding-ada-002', input: query });
+    let vector = embed.data[0].embedding;
+    if (vector.length !== pcTargetDim) vector = downProject(vector, pcTargetDim);
+    
+    const idx = pinecone.index(pcIndexName);
+    const results = await idx.query({ vector, topK, includeMetadata: true });
+    
+    return (results.matches || []).map(m => ({
+      type: 'pinecone',
+      title: m.metadata?.title || m.id,
+      snippet: (m.metadata?.text || '').substring(0, 200),
+      score: m.score
+    }));
+  } catch (error) {
+    console.error('Pinecone search error:', error);
+    return [];
+  }
+}
+
+// Helper: Search PostgreSQL database
+async function searchPostgres(query, pool) {
+  try {
+    const client = await pool.connect();
+    try {
+      // Search drivers
+      const { rows: drivers } = await client.query(
+        `SELECT driver_id, driver_name, driver_status FROM drivers 
+         WHERE driver_name ILIKE $1 OR driver_id ILIKE $1 LIMIT 5`,
+        [`%${query}%`]
+      );
+      
+      // Search violations if query mentions violations/compliance
+      let violations = [];
+      if (query.toLowerCase().includes('violation') || query.toLowerCase().includes('compliance')) {
+        const { rows } = await client.query(
+          `SELECT dv.*, d.driver_name FROM driver_violations dv
+           JOIN drivers d ON d.driver_id = dv.transporter_id
+           ORDER BY dv.occurred_at DESC LIMIT 5`
+        );
+        violations = rows;
+      }
+      
+      return {
+        drivers,
+        violations
+      };
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('PostgreSQL search error:', error);
+    return { drivers: [], violations: [] };
+  }
+}
+
+// Helper: Search Microsoft Graph API (placeholder - needs authentication flow)
+async function searchMicrosoft(query, accessToken) {
+  // This would require Microsoft Graph API authentication
+  // For now, return placeholder indicating this needs setup
+  return [];
+}
+
+// Helper: Search ADP API (placeholder - needs certificate authentication)
+async function searchADP(query) {
+  // This would require ADP API authentication with certificate
+  // For now, return placeholder indicating this needs setup
+  return [];
+}
+
+// POST /api/smart-agent/chat - Main Smart Agent endpoint
+app.post('/api/smart-agent/chat', async (req, res) => {
+  try {
+    const { message, clientFilter, enabledDatabases = [], conversationHistory = [] } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'message_required' });
+    }
+    
+    console.log(`Smart Agent query: "${message}" with databases: [${enabledDatabases.join(', ')}]`);
+    
+    // Collect context from enabled sources
+    const contextSources = [];
+    const sources = [];
+    
+    // Search Pinecone if enabled
+    if (enabledDatabases.includes('pinecone')) {
+      const pineconeResults = await searchPinecone(message, 5);
+      pineconeResults.forEach(r => {
+        contextSources.push(`[Pinecone] ${r.title}: ${r.snippet}`);
+        sources.push(r);
+      });
+    }
+    
+    // Search Web if enabled (prioritize compliance URLs)
+    if (enabledDatabases.includes('web')) {
+      const webResults = await searchWeb(message, true);
+      webResults.forEach(r => {
+        contextSources.push(`[Web] ${r.title}: ${r.snippet}`);
+        sources.push(r);
+      });
+    }
+    
+    // Search PostgreSQL if enabled
+    if (enabledDatabases.includes('postgres')) {
+      const pgResults = await searchPostgres(message, pool);
+      if (pgResults.drivers.length > 0) {
+        contextSources.push(`[Database] Found ${pgResults.drivers.length} matching drivers: ${pgResults.drivers.map(d => d.driver_name).join(', ')}`);
+        pgResults.drivers.forEach(d => {
+          sources.push({
+            type: 'database',
+            title: `Driver: ${d.driver_name}`,
+            snippet: `ID: ${d.driver_id}, Status: ${d.driver_status}`
+          });
+        });
+      }
+      if (pgResults.violations.length > 0) {
+        contextSources.push(`[Database] Found ${pgResults.violations.length} recent violations`);
+        sources.push({
+          type: 'database',
+          title: 'Recent Violations',
+          snippet: `${pgResults.violations.length} compliance violations found in system`
+        });
+      }
+    }
+    
+    // Search Microsoft 365 if enabled (placeholder)
+    if (enabledDatabases.includes('microsoft')) {
+      sources.push({
+        type: 'microsoft',
+        title: 'Microsoft 365 Integration',
+        snippet: 'Microsoft Graph API integration pending - requires authentication setup'
+      });
+    }
+    
+    // Search ADP if enabled (placeholder)
+    if (enabledDatabases.includes('adp')) {
+      sources.push({
+        type: 'adp',
+        title: 'ADP Payroll Integration',
+        snippet: 'ADP API integration pending - requires certificate authentication'
+      });
+    }
+    
+    // Build conversation context
+    const conversationContext = conversationHistory.slice(-5).map(msg => 
+      `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+    ).join('\n');
+    
+    // Generate response using GPT-4
+    const systemPrompt = `You are an intelligent operations assistant with access to multiple data sources including:
+- Internal knowledge base (Pinecone vector database)
+- Company operations database (PostgreSQL)
+- Web search for compliance regulations
+- Microsoft 365 (emails, calendar, teams - coming soon)
+- ADP Payroll system (coming soon)
+
+Your role is to:
+1. Provide accurate, well-formatted answers using available data
+2. Cite sources clearly for all information
+3. Format responses in clean Markdown with tables where appropriate
+4. Be conversational but professional
+5. If information is not available, clearly state that
+6. Focus on operations, compliance, payroll, and logistics topics
+
+Context from search:
+${contextSources.join('\n\n')}
+
+Previous conversation:
+${conversationContext}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4', // Using GPT-4 as specified
+      temperature: 0.3,
+      max_tokens: 2000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ]
+    });
+    
+    const response = completion.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response.';
+    
+    res.json({
+      response,
+      sources: sources.length > 0 ? sources : undefined
+    });
+    
+  } catch (error) {
+    console.error('Smart Agent error:', error);
+    res.status(500).json({ 
+      error: 'smart_agent_failed', 
+      detail: error.message 
+    });
+  }
+});
+
+// GET /api/smart-agent/compliance-urls - Get compliance URL configuration
+app.get('/api/smart-agent/compliance-urls', (req, res) => {
+  res.json({ urls: complianceUrls });
+});
+
+// POST /api/smart-agent/compliance-urls - Update compliance URLs
+app.post('/api/smart-agent/compliance-urls', (req, res) => {
+  const { urls } = req.body;
+  if (!urls || !Array.isArray(urls)) {
+    return res.status(400).json({ error: 'urls_array_required' });
+  }
+  
+  complianceUrls = urls.map(u => ({
+    url: u.url,
+    category: u.category || 'General',
+    enabled: u.enabled !== false
+  }));
+  
+  res.json({ ok: true, urls: complianceUrls });
 });
 
 // Static hosting for built frontend

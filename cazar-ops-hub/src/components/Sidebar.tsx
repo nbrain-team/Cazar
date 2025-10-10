@@ -8,7 +8,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  DollarSign
+  DollarSign,
+  Bot
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ expanded, onToggle }) => {
     { path: '/drivers', icon: Users, label: 'Drivers' },
     { path: '/payroll', icon: DollarSign, label: 'Payroll' },
     { path: '/reports', icon: FileText, label: 'Reports' },
+    { path: '/smart-agent', icon: Bot, label: 'Smart Agent' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 
