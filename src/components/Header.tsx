@@ -1,12 +1,8 @@
 import { useAuth } from '../context/AuthContext';
-import { LogOut, User, Bell, MessageCircle } from 'lucide-react';
+import { LogOut, User, Bell } from 'lucide-react';
 
 export const Header = () => {
   const { user, logout } = useAuth();
-
-  const openSmartChat = () => {
-    window.dispatchEvent(new CustomEvent('toggle-smart-chat', { detail: { open: true } }));
-  };
 
   return (
     <header style={{
@@ -43,14 +39,6 @@ export const Header = () => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <button
-          className="btn btn-secondary"
-          onClick={openSmartChat}
-        >
-          <MessageCircle size={18} />
-          Smart Chat
-        </button>
-
         <button
           style={{
             background: 'none',

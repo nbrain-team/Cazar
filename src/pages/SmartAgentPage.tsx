@@ -30,7 +30,6 @@ interface DatabaseSource {
 export default function SmartAgentPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [clientFilter, setClientFilter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showDatabaseSelector, setShowDatabaseSelector] = useState(false);
   const [showComplianceManager, setShowComplianceManager] = useState(false);
@@ -75,7 +74,6 @@ export default function SmartAgentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: inputValue,
-          clientFilter,
           enabledDatabases: enabledDbs,
           conversationHistory: messages.slice(-10),
         }),
@@ -383,25 +381,6 @@ export default function SmartAgentPage() {
         borderRadius: 'var(--radius)',
         boxShadow: 'var(--shadow)',
       }}>
-        {/* Client Filter Input */}
-        <input
-          type="text"
-          placeholder="Select client (type to search...)"
-          value={clientFilter}
-          onChange={(e) => setClientFilter(e.target.value)}
-          style={{
-            flex: '0 0 250px',
-            padding: '0.75rem',
-            border: '1px solid var(--border)',
-            borderRadius: '8px',
-            fontSize: '0.875rem',
-            outline: 'none',
-            background: 'var(--input-bg)',
-          }}
-          onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-          onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
-        />
-
         {/* Message Input */}
         <textarea
           placeholder="Ask a question or type a command..."
