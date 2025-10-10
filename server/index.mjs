@@ -2094,9 +2094,10 @@ async function searchPostgres(query, pool) {
   }
 }
 
-// Import Microsoft and ADP services
+// Import Microsoft, ADP, and Read.AI services
 import { searchMicrosoft365 } from './lib/microsoftGraph.mjs';
 import { searchADP as searchADPService } from './lib/adpService.mjs';
+import { processMeetingTranscript, searchMeetings } from './lib/readAIService.mjs';
 
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
@@ -2150,6 +2151,19 @@ app.post('/api/smart-agent/chat', async (req, res) => {
           type: 'database',
           title: 'Recent Violations',
           snippet: `${pgResults.violations.length} compliance violations found in system`
+        });
+      }
+      
+      // Also search meeting transcripts
+      const meetingResults = await searchMeetings(pool, message, { limit: 5 });
+      if (meetingResults.length > 0) {
+        contextSources.push(`[Meetings] Found ${meetingResults.length} relevant meeting transcripts`);
+        meetingResults.forEach(m => {
+          sources.push({
+            type: 'meeting',
+            title: `Meeting: ${m.title}`,
+            snippet: m.summary?.substring(0, 200) || 'Meeting transcript available'
+          });
         });
       }
     }
@@ -2266,6 +2280,59 @@ ${conversationContext}`;
       error: 'smart_agent_failed', 
       detail: error.message 
     });
+  }
+});
+
+// POST /auth/readai/callback - Read.AI webhook endpoint
+app.post('/auth/readai/callback', async (req, res) => {
+  try {
+    console.log('📝 Read.AI webhook received');
+    
+    const webhookData = req.body;
+    
+    // Validate webhook data
+    if (!webhookData || (!webhookData.meeting_id && !webhookData.id)) {
+      return res.status(400).json({ error: 'Invalid webhook data' });
+    }
+    
+    // Process asynchronously (don't make webhook wait)
+    processMeetingTranscript(pool, webhookData)
+      .then(result => {
+        console.log('✅ Meeting processed:', result);
+      })
+      .catch(error => {
+        console.error('❌ Meeting processing error:', error);
+      });
+    
+    // Immediately respond to webhook
+    res.status(200).json({ 
+      success: true, 
+      message: 'Webhook received, processing meeting transcript' 
+    });
+    
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).json({ error: 'webhook_processing_failed' });
+  }
+});
+
+// GET /api/meetings/search - Search meetings
+app.get('/api/meetings/search', async (req, res) => {
+  try {
+    const { q, start_date, end_date, topic, participant, limit } = req.query;
+    
+    const results = await searchMeetings(pool, q, {
+      start_date,
+      end_date,
+      topic,
+      participant,
+      limit: parseInt(limit) || 10
+    });
+    
+    res.json({ meetings: results });
+  } catch (error) {
+    console.error('Meeting search error:', error);
+    res.status(500).json({ error: 'search_failed' });
   }
 });
 
