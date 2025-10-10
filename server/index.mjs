@@ -2116,55 +2116,84 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     
     // Search Pinecone if enabled
     if (enabledDatabases.includes('pinecone')) {
-      const pineconeResults = await searchPinecone(message, 5);
-      pineconeResults.forEach(r => {
-        contextSources.push(`[Pinecone] ${r.title}: ${r.snippet}`);
-        sources.push(r);
-      });
+      try {
+        const pineconeResults = await searchPinecone(message, 5);
+        pineconeResults.forEach(r => {
+          contextSources.push(`[Pinecone] ${r.title}: ${r.snippet}`);
+          sources.push(r);
+        });
+      } catch (error) {
+        console.error('Pinecone search error:', error.message);
+        sources.push({
+          type: 'pinecone',
+          title: 'Pinecone Vector DB',
+          snippet: `Service temporarily unavailable. ${error.message.includes('billing') ? 'Please check Pinecone billing settings.' : 'Error: ' + error.message}`
+        });
+      }
     }
     
     // Search Web if enabled (prioritize compliance URLs)
     if (enabledDatabases.includes('web')) {
-      const webResults = await searchWeb(message, true);
-      webResults.forEach(r => {
-        contextSources.push(`[Web] ${r.title}: ${r.snippet}`);
-        sources.push(r);
-      });
+      try {
+        const webResults = await searchWeb(message, true);
+        webResults.forEach(r => {
+          contextSources.push(`[Web] ${r.title}: ${r.snippet}`);
+          sources.push(r);
+        });
+      } catch (error) {
+        console.error('Web search error:', error.message);
+        sources.push({
+          type: 'web',
+          title: 'Web Search',
+          snippet: 'Service temporarily unavailable. Please check SERP API settings.'
+        });
+      }
     }
     
     // Search PostgreSQL if enabled
     if (enabledDatabases.includes('postgres')) {
-      const pgResults = await searchPostgres(message, pool);
-      if (pgResults.drivers.length > 0) {
-        contextSources.push(`[Database] Found ${pgResults.drivers.length} matching drivers: ${pgResults.drivers.map(d => d.driver_name).join(', ')}`);
-        pgResults.drivers.forEach(d => {
+      try {
+        const pgResults = await searchPostgres(message, pool);
+        if (pgResults.drivers.length > 0) {
+          contextSources.push(`[Database] Found ${pgResults.drivers.length} matching drivers: ${pgResults.drivers.map(d => d.driver_name).join(', ')}`);
+          pgResults.drivers.forEach(d => {
+            sources.push({
+              type: 'database',
+              title: `Driver: ${d.driver_name}`,
+              snippet: `ID: ${d.driver_id}, Status: ${d.driver_status}`
+            });
+          });
+        }
+        if (pgResults.violations.length > 0) {
+          contextSources.push(`[Database] Found ${pgResults.violations.length} recent violations`);
           sources.push({
             type: 'database',
-            title: `Driver: ${d.driver_name}`,
-            snippet: `ID: ${d.driver_id}, Status: ${d.driver_status}`
+            title: 'Recent Violations',
+            snippet: `${pgResults.violations.length} compliance violations found in system`
           });
-        });
-      }
-      if (pgResults.violations.length > 0) {
-        contextSources.push(`[Database] Found ${pgResults.violations.length} recent violations`);
-        sources.push({
-          type: 'database',
-          title: 'Recent Violations',
-          snippet: `${pgResults.violations.length} compliance violations found in system`
-        });
-      }
-      
-      // Also search meeting transcripts
-      const meetingResults = await searchMeetings(pool, message, { limit: 5 });
-      if (meetingResults.length > 0) {
-        contextSources.push(`[Meetings] Found ${meetingResults.length} relevant meeting transcripts`);
-        meetingResults.forEach(m => {
-          sources.push({
-            type: 'meeting',
-            title: `Meeting: ${m.title}`,
-            snippet: m.summary?.substring(0, 200) || 'Meeting transcript available'
-          });
-        });
+        }
+        
+        // Also search meeting transcripts (ignore if table doesn't exist yet)
+        try {
+          const meetingResults = await searchMeetings(pool, message, { limit: 5 });
+          if (meetingResults.length > 0) {
+            contextSources.push(`[Meetings] Found ${meetingResults.length} relevant meeting transcripts`);
+            meetingResults.forEach(m => {
+              sources.push({
+                type: 'meeting',
+                title: `Meeting: ${m.title}`,
+                snippet: m.summary?.substring(0, 200) || 'Meeting transcript available'
+              });
+            });
+          }
+        } catch (meetingErr) {
+          // Ignore if meeting table doesn't exist yet
+          if (!meetingErr.message.includes('does not exist')) {
+            console.error('Meeting search error:', meetingErr.message);
+          }
+        }
+      } catch (error) {
+        console.error('PostgreSQL search error:', error.message);
       }
     }
     
@@ -2235,13 +2264,16 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
     ).join('\n');
     
-    // Generate response using GPT-4
-    const systemPrompt = `You are an intelligent operations assistant with access to multiple data sources including:
+    // Generate response using GPT-4 (with fallback if API issues)
+    let response;
+    
+    try {
+      const systemPrompt = `You are an intelligent operations assistant with access to multiple data sources including:
 - Internal knowledge base (Pinecone vector database)
 - Company operations database (PostgreSQL)
 - Web search for compliance regulations
-- Microsoft 365 (emails, calendar, teams - coming soon)
-- ADP Payroll system (coming soon)
+- Microsoft 365 (emails, calendar, teams)
+- ADP Payroll system
 
 Your role is to:
 1. Provide accurate, well-formatted answers using available data
@@ -2257,17 +2289,39 @@ ${contextSources.join('\n\n')}
 Previous conversation:
 ${conversationContext}`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4', // Using GPT-4 as specified
-      temperature: 0.3,
-      max_tokens: 2000,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ]
-    });
-    
-    const response = completion.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response.';
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4', // Using GPT-4 as specified
+        temperature: 0.3,
+        max_tokens: 2000,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ]
+      });
+      
+      response = completion.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response.';
+      
+    } catch (aiError) {
+      console.error('OpenAI API error:', aiError.message);
+      
+      // Provide helpful response even without AI
+      if (sources.length > 0) {
+        response = `# Search Results for: "${message}"\n\n`;
+        response += `I found ${sources.length} relevant sources, but the AI service is temporarily unavailable.\n\n`;
+        response += `## Sources Found:\n\n`;
+        sources.forEach((s, i) => {
+          response += `${i + 1}. **${s.title}**\n`;
+          if (s.snippet) response += `   ${s.snippet}\n`;
+          response += `\n`;
+        });
+        response += `\n*Note: AI analysis unavailable. ${aiError.message.includes('billing') ? 'Please check OpenAI billing settings.' : 'Please try again later.'}*`;
+      } else {
+        response = `# Service Temporarily Unavailable\n\n`;
+        response += `The AI service is currently unavailable. ${aiError.message.includes('billing') ? '**Please check OpenAI API billing settings.**' : 'Please try again in a moment.'}\n\n`;
+        response += `**Your question:** ${message}\n\n`;
+        response += `I'll be able to provide intelligent answers once the service is restored.`;
+      }
+    }
     
     res.json({
       response,
