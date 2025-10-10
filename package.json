@@ -14,6 +14,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@azure/msal-node": "^2.14.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@pinecone-database/pinecone": "^3.0.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-select": "^2.2.5",
