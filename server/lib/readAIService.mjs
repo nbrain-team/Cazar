@@ -55,7 +55,7 @@ function chunkTranscript(transcript, maxChunkSize = 1000) {
 async function extractActionItems(transcript) {
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       temperature: 0.3,
       max_tokens: 1000,
       messages: [
@@ -83,7 +83,7 @@ async function extractActionItems(transcript) {
 async function extractTopics(transcript) {
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       temperature: 0.3,
       max_tokens: 500,
       messages: [
@@ -111,7 +111,7 @@ async function extractTopics(transcript) {
 async function generateSummary(transcript) {
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       temperature: 0.3,
       max_tokens: 500,
       messages: [

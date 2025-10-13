@@ -2290,7 +2290,7 @@ Previous conversation:
 ${conversationContext}`;
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4', // Using GPT-4 as specified
+        model: 'gpt-4o', // Using GPT-4o (latest model with vision, faster, cheaper)
         temperature: 0.3,
         max_tokens: 2000,
         messages: [
