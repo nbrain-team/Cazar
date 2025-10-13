@@ -27,9 +27,11 @@ async function getAccessToken() {
   try {
     // Return cached token if still valid
     if (accessToken && tokenExpiry && Date.now() < tokenExpiry) {
+      console.log('[Microsoft] Using cached access token');
       return accessToken;
     }
 
+    console.log('[Microsoft] Acquiring new access token...');
     const client = getMsalClient();
     const tokenRequest = {
       scopes: ['https://graph.microsoft.com/.default'],

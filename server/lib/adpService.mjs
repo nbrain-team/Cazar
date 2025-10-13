@@ -200,24 +200,31 @@ export async function searchTimeAndAttendance(query, options = {}) {
 // Main search function that tries multiple ADP endpoints
 export async function searchADP(query, options = {}) {
   try {
+    console.log(`[ADP] Starting search for query: "${query}"`);
+    
     // Determine what to search based on query keywords
     const lowerQuery = query.toLowerCase();
     const searches = [];
     
     // Always search employees
+    console.log('[ADP] Searching employees...');
     searches.push(searchEmployees(query));
     
     // Search payroll if query mentions pay, salary, wages, etc.
     if (lowerQuery.includes('payroll') || lowerQuery.includes('pay') || 
         lowerQuery.includes('salary') || lowerQuery.includes('wage')) {
+      console.log('[ADP] Searching payroll...');
       searches.push(searchPayroll(query, options));
     }
     
     // Search time & attendance if query mentions hours, time, attendance, etc.
     if (lowerQuery.includes('hours') || lowerQuery.includes('time') || 
         lowerQuery.includes('attendance') || lowerQuery.includes('timecard')) {
+      console.log('[ADP] Searching time & attendance...');
       searches.push(searchTimeAndAttendance(query, options));
     }
+    
+    console.log(`[ADP] Running ${searches.length} searches in parallel...`);
     
     const results = await Promise.allSettled(searches);
     const allResults = [];
@@ -225,17 +232,20 @@ export async function searchADP(query, options = {}) {
     for (const result of results) {
       if (result.status === 'fulfilled' && result.value) {
         allResults.push(...result.value);
+      } else if (result.status === 'rejected') {
+        console.error('[ADP] Search failed:', result.reason?.message || result.reason);
       }
     }
     
+    console.log(`[ADP] Found ${allResults.length} total results`);
     return allResults.slice(0, 10);
   } catch (error) {
-    console.error('ADP search error:', error);
+    console.error('[ADP] Main search error:', error);
     // Return informative error result instead of throwing
     return [{
       type: 'adp',
-      title: 'ADP API Configuration Needed',
-      snippet: 'ADP certificate authentication is configured but API connection needs testing. Error: ' + error.message,
+      title: 'ADP API Error',
+      snippet: `ADP certificate authentication configured. Connection error: ${error.message}. Check if certificate is valid and ADP API endpoints are accessible.`,
     }];
   }
 }
