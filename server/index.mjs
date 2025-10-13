@@ -2390,6 +2390,21 @@ app.get('/api/meetings/search', async (req, res) => {
   }
 });
 
+// GET /api/smart-agent/env-check - Check environment variables (diagnostic)
+app.get('/api/smart-agent/env-check', (req, res) => {
+  const envCheck = {
+    openai_key_prefix: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 15) + '...' : 'NOT SET',
+    openai_key_suffix: process.env.OPENAI_API_KEY ? '...' + process.env.OPENAI_API_KEY.substring(process.env.OPENAI_API_KEY.length - 10) : 'NOT SET',
+    openai_key_length: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
+    pinecone_key_set: !!process.env.PINECONE_API_KEY,
+    pinecone_index: process.env.PINECONE_INDEX_NAME,
+    microsoft_client_id: process.env.MICROSOFT_CLIENT_ID ? process.env.MICROSOFT_CLIENT_ID.substring(0, 8) + '...' : 'NOT SET',
+    database_url_set: !!process.env.DATABASE_URL,
+    serp_key_set: !!process.env.SERP_API_KEY
+  };
+  res.json(envCheck);
+});
+
 // GET /api/smart-agent/compliance-urls - Get compliance URL configuration
 app.get('/api/smart-agent/compliance-urls', (req, res) => {
   res.json({ urls: complianceUrls });
