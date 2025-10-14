@@ -2484,6 +2484,156 @@ app.post('/api/smart-agent/compliance-urls', (req, res) => {
   res.json({ ok: true, urls: complianceUrls });
 });
 
+// =============================
+// Admin User Management API
+// =============================
+import bcrypt from 'bcrypt';
+
+// GET /api/admin/users - List all users
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT 
+        u.id,
+        u.username,
+        u.email,
+        u.name as full_name,
+        u.role,
+        u.is_active,
+        u.created_at,
+        u.last_login,
+        COALESCE(
+          json_agg(
+            CASE WHEN p.enabled THEN p.data_source ELSE NULL END
+          ) FILTER (WHERE p.enabled IS TRUE),
+          '[]'
+        ) as permissions
+      FROM users u
+      LEFT JOIN user_data_source_permissions p ON u.id = p.user_id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+    `);
+    
+    res.json({ users: rows });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'failed_to_fetch_users' });
+  }
+});
+
+// POST /api/admin/users - Create new user
+app.post('/api/admin/users', async (req, res) => {
+  try {
+    const { username, email, full_name, password, role, permissions = [] } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'username, email, and password required' });
+    }
+    
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Create user
+      const { rows } = await client.query(
+        `INSERT INTO users (username, email, name, password_hash, role)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id`,
+        [username, email, full_name || null, passwordHash, role || 'user']
+      );
+      
+      const userId = rows[0].id;
+      
+      // Add permissions
+      for (const dataSource of permissions) {
+        await client.query(
+          `INSERT INTO user_data_source_permissions (user_id, data_source, enabled)
+           VALUES ($1, $2, true)`,
+          [userId, dataSource]
+        );
+      }
+      
+      // Log audit
+      await client.query(
+        `INSERT INTO user_audit_log (admin_user_id, target_user_id, action, details)
+         VALUES ($1, $2, $3, $4)`,
+        [userId, userId, 'create_user', JSON.stringify({ username, email, role, permissions })]
+      );
+      
+      await client.query('COMMIT');
+      
+      res.json({ success: true, user_id: userId });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'failed_to_create_user', detail: error.message });
+  }
+});
+
+// PUT /api/admin/users/:userId/permissions - Update user permissions
+app.put('/api/admin/users/:userId/permissions', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { permissions = [] } = req.body;
+    
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Delete existing permissions
+      await client.query(
+        'DELETE FROM user_data_source_permissions WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Add new permissions
+      for (const dataSource of permissions) {
+        await client.query(
+          `INSERT INTO user_data_source_permissions (user_id, data_source, enabled)
+           VALUES ($1, $2, true)`,
+          [userId, dataSource]
+        );
+      }
+      
+      await client.query('COMMIT');
+      
+      res.json({ success: true });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating permissions:', error);
+    res.status(500).json({ error: 'failed_to_update_permissions' });
+  }
+});
+
+// DELETE /api/admin/users/:userId - Delete user
+app.delete('/api/admin/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    await pool.query('DELETE FROM users WHERE id = $1 AND role != $2', [userId, 'admin']);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'failed_to_delete_user' });
+  }
+});
+
 // Static hosting for built frontend
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

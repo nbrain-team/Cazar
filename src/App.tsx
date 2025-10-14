@@ -18,6 +18,7 @@ import Hos607Page from './pages/Hos607Page';
 import HosRulesPage from './pages/HosRulesPage';
 import HOSCompliancePage from './pages/HOSCompliancePage';
 import SmartAgentPage from './pages/SmartAgentPage';
+import AdminPage from './pages/AdminPage';
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ function App() {
                       <Route path="/hos" element={<HOSCompliancePage />} />
                       <Route path="/reports" element={<ReportsPage />} />
                       <Route path="/smart-agent" element={<SmartAgentPage />} />
+                      <Route path="/admin" element={<AdminPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="*" element={<Navigate to="/dashboard" />} />
                     </Routes>
