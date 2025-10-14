@@ -2181,8 +2181,16 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     }
     
     // Search Web if enabled (prioritize compliance URLs)
-    if (enabledDatabases.includes('web')) {
+    // Skip web search for internal employee/payroll queries - those should only use ADP
+    const isInternalQuery = message.toLowerCase().includes('employee') || 
+                           message.toLowerCase().includes('hire') ||
+                           message.toLowerCase().includes('payroll') ||
+                           message.toLowerCase().includes('staff') ||
+                           message.toLowerCase().includes('worker');
+    
+    if (enabledDatabases.includes('web') && !isInternalQuery) {
       try {
+        console.log('[Smart Agent] Running web search for compliance/regulatory content...');
         const webResults = await searchWeb(message, true);
         webResults.forEach(r => {
           contextSources.push(`[Web] ${r.title}: ${r.snippet}`);
@@ -2190,12 +2198,9 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         });
       } catch (error) {
         console.error('Web search error:', error.message);
-        sources.push({
-          type: 'web',
-          title: 'Web Search',
-          snippet: 'Service temporarily unavailable. Please check SERP API settings.'
-        });
       }
+    } else if (isInternalQuery) {
+      console.log('[Smart Agent] Skipping web search - internal employee/payroll query should use ADP only');
     }
     
     // Search PostgreSQL if enabled

@@ -372,15 +372,37 @@ export async function searchADP(query, options = {}) {
       if (lowerQuery.includes('list') || lowerQuery.includes('all') || 
           lowerQuery.includes('current') || lowerQuery.includes('active')) {
         console.log('[ADP] Fetching complete employee list...');
-        const employees = await searchEmployees(''); // Empty string returns all
+        
+        // Get ALL employees (not limited to 10)
+        const response = await makeADPRequest('/hr/v2/workers');
+        
+        if (!response.workers || !Array.isArray(response.workers)) {
+          console.log('[ADP] No workers in response');
+          return [];
+        }
+        
+        console.log(`[ADP] Found ${response.workers.length} total workers from API`);
         
         // Filter for active employees if query specifies "current" or "active"
-        const filteredEmployees = (lowerQuery.includes('current') || lowerQuery.includes('active'))
-          ? employees.filter(e => e.status === 'Active')
-          : employees;
+        let filteredWorkers = response.workers;
+        if (lowerQuery.includes('current') || lowerQuery.includes('active')) {
+          filteredWorkers = response.workers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Active');
+          console.log(`[ADP] Filtered to ${filteredWorkers.length} active employees`);
+        }
         
-        console.log(`[ADP] Returning ${filteredEmployees.length} employees`);
-        return filteredEmployees;
+        // Convert to result format
+        const results = filteredWorkers.slice(0, 20).map(worker => ({
+          type: 'employee',
+          title: worker.person?.legalName?.formattedName || 'Unknown Employee',
+          employeeId: worker.associateOID,
+          email: worker.businessCommunication?.emails?.[0]?.emailUri,
+          hireDate: worker.workerDates?.originalHireDate,
+          status: worker.workerStatus?.statusCode?.codeValue,
+          snippet: `Employee ID: ${worker.associateOID} - Status: ${worker.workerStatus?.statusCode?.codeValue || 'Unknown'} - Hired: ${worker.workerDates?.originalHireDate || 'N/A'}`,
+        }));
+        
+        console.log(`[ADP] Returning ${results.length} employee results`);
+        return results;
       }
       
       // Otherwise, return summary with recent hires
