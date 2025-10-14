@@ -2117,18 +2117,21 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     // Search Pinecone if enabled
     if (enabledDatabases.includes('pinecone')) {
       try {
+        console.log(`[Smart Agent] Searching Pinecone for: "${message}"`);
         const pineconeResults = await searchPinecone(message, 5);
-        pineconeResults.forEach(r => {
-          contextSources.push(`[Pinecone] ${r.title}: ${r.snippet}`);
-          sources.push(r);
-        });
+        console.log(`[Smart Agent] Pinecone returned ${pineconeResults.length} results`);
+        
+        if (pineconeResults.length > 0) {
+          pineconeResults.forEach(r => {
+            console.log(`[Smart Agent] Pinecone result: ${r.title} (score: ${r.score})`);
+            contextSources.push(`[Pinecone] ${r.title}: ${r.snippet}`);
+            sources.push(r);
+          });
+        }
       } catch (error) {
-        console.error('Pinecone search error:', error.message);
-        sources.push({
-          type: 'pinecone',
-          title: 'Pinecone Vector DB',
-          snippet: `Service temporarily unavailable. ${error.message.includes('billing') ? 'Please check Pinecone billing settings.' : 'Error: ' + error.message}`
-        });
+        console.error('[Smart Agent] Pinecone search error:', error.message);
+        // Don't add Pinecone to sources if it's failing - better to have no results than wrong results
+        console.log('[Smart Agent] Skipping Pinecone results due to error');
       }
     }
     
@@ -2232,8 +2235,12 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     // Search ADP if enabled
     if (enabledDatabases.includes('adp')) {
       try {
+        console.log(`[Smart Agent] Searching ADP for: "${message}"`);
         const adpResults = await searchADPService(message);
+        console.log(`[Smart Agent] ADP returned ${adpResults.length} results`);
+        
         adpResults.forEach(r => {
+          console.log(`[Smart Agent] ADP result: [${r.type}] ${r.title}`);
           contextSources.push(`[ADP - ${r.type}] ${r.title}: ${r.snippet}`);
           sources.push({
             type: 'adp',
@@ -2243,6 +2250,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         });
         
         if (adpResults.length === 0) {
+          console.log('[Smart Agent] ADP search returned 0 results - showing status message');
           sources.push({
             type: 'adp',
             title: 'ADP Payroll',
@@ -2250,7 +2258,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
           });
         }
       } catch (error) {
-        console.error('ADP search error:', error);
+        console.error('[Smart Agent] ADP search error:', error.message, error.stack);
         sources.push({
           type: 'adp',
           title: 'ADP Connection',
@@ -2322,6 +2330,14 @@ ${conversationContext}`;
         response += `I'll be able to provide intelligent answers once the service is restored.`;
       }
     }
+    
+    // Log summary of what sources were used
+    const sourceSummary = sources.reduce((acc, s) => {
+      acc[s.type] = (acc[s.type] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`[Smart Agent] Response generated with ${sources.length} total sources:`, sourceSummary);
+    console.log(`[Smart Agent] Context had ${contextSources.length} items for AI`);
     
     res.json({
       response,

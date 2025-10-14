@@ -20,6 +20,7 @@ function getCertificateConfig() {
 async function makeADPRequest(endpoint, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {
     try {
+      console.log(`[ADP API] Making ${method} request to: ${endpoint}`);
       const { cert, key } = getCertificateConfig();
       const url = new URL(endpoint, ADP_API_BASE);
       
@@ -39,22 +40,27 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
       
       const req = https.request(options, (res) => {
         let data = '';
+        console.log(`[ADP API] Response status: ${res.statusCode}`);
         
         res.on('data', (chunk) => {
           data += chunk;
         });
         
         res.on('end', () => {
+          console.log(`[ADP API] Response data length: ${data.length} bytes`);
           try {
             const parsed = JSON.parse(data);
+            console.log(`[ADP API] Successfully parsed JSON response with ${Object.keys(parsed).length} keys`);
             resolve(parsed);
           } catch (err) {
+            console.log(`[ADP API] Failed to parse JSON, returning raw data`);
             resolve({ raw: data });
           }
         });
       });
       
       req.on('error', (err) => {
+        console.error(`[ADP API] Request error: ${err.message}`);
         reject(err);
       });
       
@@ -64,6 +70,7 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
       
       req.end();
     } catch (error) {
+      console.error(`[ADP API] Setup error: ${error.message}`);
       reject(error);
     }
   });
@@ -72,6 +79,7 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
 // Search payroll data
 export async function searchPayroll(query, options = {}) {
   try {
+    console.log(`[ADP Payroll] Searching with options:`, options);
     const { startDate, endDate, employeeId } = options;
     
     // Build query parameters
@@ -87,6 +95,7 @@ export async function searchPayroll(query, options = {}) {
     const results = [];
     
     if (response.payrollOutput) {
+      console.log(`[ADP Payroll] Found ${response.payrollOutput.length} payroll records`);
       for (const payroll of response.payrollOutput) {
         const employee = payroll.worker?.person;
         const earnings = payroll.payDistribution?.earnings || [];
@@ -103,11 +112,14 @@ export async function searchPayroll(query, options = {}) {
           snippet: `Total gross pay: $${totalGross.toFixed(2)} on ${payroll.payDate}`,
         });
       }
+    } else {
+      console.log(`[ADP Payroll] No payrollOutput in response. Response keys: ${Object.keys(response).join(', ')}`);
     }
     
+    console.log(`[ADP Payroll] Returning ${results.length} results`);
     return results;
   } catch (error) {
-    console.error('ADP payroll search error:', error);
+    console.error('[ADP Payroll] Search error:', error.message, error.stack);
     return [];
   }
 }
@@ -115,6 +127,7 @@ export async function searchPayroll(query, options = {}) {
 // Get employee/worker information
 export async function searchEmployees(query) {
   try {
+    console.log(`[ADP Employees] Searching for: "${query}"`);
     // Search workers by name or ID
     const endpoint = '/hr/v2/workers';
     const response = await makeADPRequest(endpoint);
@@ -122,12 +135,15 @@ export async function searchEmployees(query) {
     const results = [];
     
     if (response.workers) {
+      console.log(`[ADP Employees] Found ${response.workers.length} total workers`);
       const filtered = response.workers.filter(worker => {
         const name = worker.person?.legalName?.formattedName || '';
         const id = worker.associateOID || '';
         return name.toLowerCase().includes(query.toLowerCase()) || 
                id.toLowerCase().includes(query.toLowerCase());
       });
+      
+      console.log(`[ADP Employees] ${filtered.length} workers match query`);
       
       for (const worker of filtered.slice(0, 5)) {
         const person = worker.person;
@@ -143,11 +159,14 @@ export async function searchEmployees(query) {
           snippet: `Employee ID: ${worker.associateOID} - Status: ${worker.workerStatus?.statusCode?.codeValue || 'Unknown'}`,
         });
       }
+    } else {
+      console.log(`[ADP Employees] No workers in response. Response keys: ${Object.keys(response).join(', ')}`);
     }
     
+    console.log(`[ADP Employees] Returning ${results.length} results`);
     return results;
   } catch (error) {
-    console.error('ADP employee search error:', error);
+    console.error('[ADP Employees] Search error:', error.message, error.stack);
     return [];
   }
 }
@@ -201,27 +220,47 @@ export async function searchTimeAndAttendance(query, options = {}) {
 export async function searchADP(query, options = {}) {
   try {
     console.log(`[ADP] Starting search for query: "${query}"`);
+    console.log(`[ADP] Options provided:`, options);
     
     // Determine what to search based on query keywords
     const lowerQuery = query.toLowerCase();
     const searches = [];
     
-    // Always search employees
+    // Infer date ranges if query mentions "last week", "last month", etc.
+    let inferredOptions = { ...options };
+    if (lowerQuery.includes('last week') || lowerQuery.includes('recent week') || lowerQuery.includes('this week')) {
+      const endDate = new Date();
+      const startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 7);
+      inferredOptions.startDate = formatADPDate(startDate);
+      inferredOptions.endDate = formatADPDate(endDate);
+      console.log(`[ADP] Inferred date range for "last week": ${inferredOptions.startDate} to ${inferredOptions.endDate}`);
+    } else if (lowerQuery.includes('last month') || lowerQuery.includes('recent month')) {
+      const endDate = new Date();
+      const startDate = new Date(endDate);
+      startDate.setMonth(startDate.getMonth() - 1);
+      inferredOptions.startDate = formatADPDate(startDate);
+      inferredOptions.endDate = formatADPDate(endDate);
+      console.log(`[ADP] Inferred date range for "last month": ${inferredOptions.startDate} to ${inferredOptions.endDate}`);
+    }
+    
+    // Always search employees for general queries
     console.log('[ADP] Searching employees...');
     searches.push(searchEmployees(query));
     
     // Search payroll if query mentions pay, salary, wages, etc.
     if (lowerQuery.includes('payroll') || lowerQuery.includes('pay') || 
-        lowerQuery.includes('salary') || lowerQuery.includes('wage')) {
+        lowerQuery.includes('salary') || lowerQuery.includes('wage') ||
+        lowerQuery.includes('earnings') || lowerQuery.includes('compensation')) {
       console.log('[ADP] Searching payroll...');
-      searches.push(searchPayroll(query, options));
+      searches.push(searchPayroll(query, inferredOptions));
     }
     
     // Search time & attendance if query mentions hours, time, attendance, etc.
     if (lowerQuery.includes('hours') || lowerQuery.includes('time') || 
         lowerQuery.includes('attendance') || lowerQuery.includes('timecard')) {
       console.log('[ADP] Searching time & attendance...');
-      searches.push(searchTimeAndAttendance(query, options));
+      searches.push(searchTimeAndAttendance(query, inferredOptions));
     }
     
     console.log(`[ADP] Running ${searches.length} searches in parallel...`);
@@ -229,18 +268,20 @@ export async function searchADP(query, options = {}) {
     const results = await Promise.allSettled(searches);
     const allResults = [];
     
-    for (const result of results) {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
       if (result.status === 'fulfilled' && result.value) {
+        console.log(`[ADP] Search ${i + 1} returned ${result.value.length} results`);
         allResults.push(...result.value);
       } else if (result.status === 'rejected') {
-        console.error('[ADP] Search failed:', result.reason?.message || result.reason);
+        console.error(`[ADP] Search ${i + 1} failed:`, result.reason?.message || result.reason);
       }
     }
     
     console.log(`[ADP] Found ${allResults.length} total results`);
     return allResults.slice(0, 10);
   } catch (error) {
-    console.error('[ADP] Main search error:', error);
+    console.error('[ADP] Main search error:', error.message, error.stack);
     // Return informative error result instead of throwing
     return [{
       type: 'adp',
