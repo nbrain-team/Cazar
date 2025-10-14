@@ -349,10 +349,43 @@ export async function searchADP(query, options = {}) {
     console.log(`[ADP] Options provided:`, options);
     
     const lowerQuery = query.toLowerCase();
+    
+    // Check if query is asking for summary/recent hires
+    if (lowerQuery.includes('recent hire') || lowerQuery.includes('new hire') ||
+        lowerQuery.includes('summarize') || lowerQuery.includes('summary') ||
+        lowerQuery.includes('overview') || lowerQuery.includes('workforce')) {
+      console.log('[ADP] Query requesting summary/recent hires, fetching summary data...');
+      
+      const summary = await getADPSummary();
+      const results = [];
+      
+      // Add workforce summary
+      results.push({
+        type: 'summary',
+        title: 'ADP Workforce Summary',
+        snippet: `${summary.totalWorkers} total employees (${summary.activeWorkers} active, ${summary.terminatedWorkers} terminated)`
+      });
+      
+      // Add recent hires as individual results
+      summary.recentHires.forEach(hire => {
+        results.push({
+          type: 'employee',
+          title: hire.name,
+          employeeId: hire.id,
+          hireDate: hire.hireDate,
+          status: 'Active',
+          snippet: `Recently hired on ${hire.hireDate}`
+        });
+      });
+      
+      console.log(`[ADP] Returning ${results.length} summary results (1 summary + ${summary.recentHires.length} recent hires)`);
+      return results;
+    }
+    
+    // Otherwise, search employees by name/ID
     const searches = [];
     
-    // Always search employees
-    console.log('[ADP] Searching employees...');
+    console.log('[ADP] Searching employees by name/ID...');
     searches.push(searchEmployees(query));
     
     // Search timecards if query mentions hours, time, timecard, etc.
