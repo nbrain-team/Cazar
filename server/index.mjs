@@ -2046,12 +2046,27 @@ async function searchPinecone(query, topK = 5) {
     const idx = pinecone.index(pcIndexName);
     const results = await idx.query({ vector, topK, includeMetadata: true });
     
-    return (results.matches || []).map(m => ({
-      type: 'pinecone',
-      title: m.metadata?.title || m.id,
-      snippet: (m.metadata?.text || '').substring(0, 200),
-      score: m.score
-    }));
+    // CRITICAL: Filter out low-relevance results (below 50% similarity)
+    // Scores below 0.5 are essentially random and not relevant to the query
+    const RELEVANCE_THRESHOLD = 0.50;
+    
+    const filtered = (results.matches || [])
+      .filter(m => {
+        const isRelevant = m.score >= RELEVANCE_THRESHOLD;
+        if (!isRelevant) {
+          console.log(`[Pinecone] Filtering out low-relevance result: ${m.metadata?.title || m.id} (score: ${m.score} < ${RELEVANCE_THRESHOLD})`);
+        }
+        return isRelevant;
+      })
+      .map(m => ({
+        type: 'pinecone',
+        title: m.metadata?.title || m.id,
+        snippet: (m.metadata?.text || '').substring(0, 200),
+        score: m.score
+      }));
+    
+    console.log(`[Pinecone] After relevance filtering: ${filtered.length} of ${results.matches?.length || 0} results kept (threshold: ${RELEVANCE_THRESHOLD})`);
+    return filtered;
   } catch (error) {
     console.error('Pinecone search error:', error);
     return [];

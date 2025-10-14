@@ -13,6 +13,19 @@ function getCertificateConfig() {
     throw new Error('ADP certificate or private key not configured in environment');
   }
   
+  // Log certificate info (but not the actual certificate for security)
+  const certPreview = cert.substring(0, 50) + '...' + cert.substring(cert.length - 50);
+  console.log(`[ADP] Certificate loaded: ${cert.length} characters, starts with: ${cert.substring(0, 30)}...`);
+  console.log(`[ADP] Private key loaded: ${key.length} characters`);
+  
+  // Check if certificate appears valid
+  if (!cert.includes('-----BEGIN CERTIFICATE-----') || !cert.includes('-----END CERTIFICATE-----')) {
+    console.warn('[ADP] WARNING: Certificate does not appear to be in valid PEM format');
+  }
+  if (!key.includes('-----BEGIN PRIVATE KEY-----') || !key.includes('-----END PRIVATE KEY-----')) {
+    console.warn('[ADP] WARNING: Private key does not appear to be in valid PEM format');
+  }
+  
   return { cert, key };
 }
 
@@ -48,9 +61,28 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
         
         res.on('end', () => {
           console.log(`[ADP API] Response data length: ${data.length} bytes`);
+          
+          // Log full response if error status
+          if (res.statusCode >= 400) {
+            console.error(`[ADP API] ERROR Response (${res.statusCode}): ${data}`);
+          }
+          
           try {
             const parsed = JSON.parse(data);
             console.log(`[ADP API] Successfully parsed JSON response with ${Object.keys(parsed).length} keys`);
+            
+            // If authentication error, reject with detailed message
+            if (res.statusCode === 401) {
+              const errorMsg = parsed.response?.error?.message || parsed.error?.message || parsed.message || 'Authentication failed';
+              reject(new Error(`ADP API Authentication Failed (401): ${errorMsg}. Certificate may be expired or invalid.`));
+              return;
+            }
+            
+            // For other errors, log but continue
+            if (res.statusCode >= 400) {
+              console.error(`[ADP API] API returned error status ${res.statusCode}`);
+            }
+            
             resolve(parsed);
           } catch (err) {
             console.log(`[ADP API] Failed to parse JSON, returning raw data`);
