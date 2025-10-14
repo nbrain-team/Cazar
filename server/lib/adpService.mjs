@@ -15,8 +15,8 @@ let tokenCache = {
 function getADPCredentials() {
   const clientId = process.env.ADP_CLIENT_ID;
   const clientSecret = process.env.ADP_CLIENT_SECRET;
-  const cert = process.env.ADP_CERTIFICATE;
-  const key = process.env.ADP_PRIVATE_KEY;
+  let cert = process.env.ADP_CERTIFICATE;
+  let key = process.env.ADP_PRIVATE_KEY;
   
   if (!clientId || !clientSecret) {
     throw new Error('ADP_CLIENT_ID or ADP_CLIENT_SECRET not configured in environment');
@@ -24,6 +24,17 @@ function getADPCredentials() {
   if (!cert || !key) {
     throw new Error('ADP_CERTIFICATE or ADP_PRIVATE_KEY not configured in environment');
   }
+  
+  // Convert literal \n to actual newlines (common issue with environment variables)
+  cert = cert.replace(/\\n/g, '\n');
+  key = key.replace(/\\n/g, '\n');
+  
+  // Remove any surrounding quotes that might have been added
+  cert = cert.replace(/^"(.*)"$/, '$1');
+  key = key.replace(/^"(.*)"$/, '$1');
+  
+  console.log('[ADP] Certificate loaded:', cert.substring(0, 30) + '...', `(${cert.length} chars)`);
+  console.log('[ADP] Private key loaded:', key.substring(0, 30) + '...', `(${key.length} chars)`);
   
   return { clientId, clientSecret, cert, key };
 }
