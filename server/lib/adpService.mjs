@@ -37,6 +37,26 @@ function getADPCredentials() {
   cert = cert.replace(/\\n/g, '\n');
   key = key.replace(/\\n/g, '\n');
   
+  // If certificate doesn't start with header, add it (Render might strip it)
+  if (!cert.startsWith('-----BEGIN CERTIFICATE-----')) {
+    console.log('[ADP] Certificate missing header, reconstructing...');
+    cert = '-----BEGIN CERTIFICATE-----\n' + cert;
+  }
+  if (!cert.endsWith('-----END CERTIFICATE-----')) {
+    if (!cert.endsWith('\n')) cert += '\n';
+    cert += '-----END CERTIFICATE-----';
+  }
+  
+  // Same for private key
+  if (!key.startsWith('-----BEGIN PRIVATE KEY-----')) {
+    console.log('[ADP] Private key missing header, reconstructing...');
+    key = '-----BEGIN PRIVATE KEY-----\n' + key;
+  }
+  if (!key.endsWith('-----END PRIVATE KEY-----')) {
+    if (!key.endsWith('\n')) key += '\n';
+    key += '-----END PRIVATE KEY-----';
+  }
+  
   console.log('[ADP] Certificate loaded:', cert.substring(0, 30) + '...', `(${cert.length} chars)`);
   console.log('[ADP] Private key loaded:', key.substring(0, 30) + '...', `(${key.length} chars)`);
   

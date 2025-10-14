@@ -2230,12 +2230,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         });
         
         if (msResults.length === 0) {
-          // Add info message if no results but API is working
-          sources.push({
-            type: 'microsoft',
-            title: 'Microsoft 365',
-            snippet: 'Connected - No matching results found for this query'
-          });
+          console.log('[Smart Agent] Microsoft 365 search returned 0 results - NOT adding to sources (user preference)');
         }
       } catch (error) {
         console.error('Microsoft 365 search error:', error);
@@ -2265,12 +2260,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         });
         
         if (adpResults.length === 0) {
-          console.log('[Smart Agent] ADP search returned 0 results - showing status message');
-          sources.push({
-            type: 'adp',
-            title: 'ADP Payroll',
-            snippet: 'Connected - No matching results found for this query'
-          });
+          console.log('[Smart Agent] ADP search returned 0 results - NOT adding to sources (user preference)');
         }
       } catch (error) {
         console.error('[Smart Agent] ADP search error:', error.message, error.stack);
