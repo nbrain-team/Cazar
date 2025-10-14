@@ -37,6 +37,10 @@ function getADPCredentials() {
   cert = cert.replace(/\\n/g, '\n');
   key = key.replace(/\\n/g, '\n');
   
+  // Trim any leading/trailing whitespace from the certificate body
+  cert = cert.trim();
+  key = key.trim();
+  
   // If certificate doesn't start with header, add it (Render might strip it)
   if (!cert.startsWith('-----BEGIN CERTIFICATE-----')) {
     console.log('[ADP] Certificate missing header, reconstructing...');
