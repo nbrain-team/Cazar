@@ -45,6 +45,9 @@ function getADPCredentials() {
   if (!cert.startsWith('-----BEGIN CERTIFICATE-----')) {
     console.log('[ADP] Certificate missing header, reconstructing...');
     cert = '-----BEGIN CERTIFICATE-----\n' + cert;
+  } else if (!cert.startsWith('-----BEGIN CERTIFICATE-----\n')) {
+    // Header exists but missing newline after it
+    cert = cert.replace('-----BEGIN CERTIFICATE-----', '-----BEGIN CERTIFICATE-----\n');
   }
   if (!cert.endsWith('-----END CERTIFICATE-----')) {
     if (!cert.endsWith('\n')) cert += '\n';
@@ -55,6 +58,10 @@ function getADPCredentials() {
   if (!key.startsWith('-----BEGIN PRIVATE KEY-----')) {
     console.log('[ADP] Private key missing header, reconstructing...');
     key = '-----BEGIN PRIVATE KEY-----\n' + key;
+  } else if (!key.startsWith('-----BEGIN PRIVATE KEY-----\n')) {
+    // Header exists but missing newline after it
+    console.log('[ADP] Private key missing newline after header, fixing...');
+    key = key.replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n');
   }
   if (!key.endsWith('-----END PRIVATE KEY-----')) {
     if (!key.endsWith('\n')) key += '\n';
