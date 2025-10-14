@@ -2009,7 +2009,10 @@ let complianceUrls = [
 async function searchWeb(query, complianceOnly = false) {
   try {
     const serpApiKey = process.env.SERP_API_KEY;
-    if (!serpApiKey) return [];
+    if (!serpApiKey) {
+      console.log('[Web Search] SERP API key not configured');
+      return [];
+    }
     
     let searchQuery = query;
     if (complianceOnly) {
@@ -2017,21 +2020,38 @@ async function searchWeb(query, complianceOnly = false) {
       if (enabledUrls.length > 0) {
         const sitesQuery = enabledUrls.map(u => `site:${new URL(u.url).hostname}`).join(' OR ');
         searchQuery = `(${sitesQuery}) ${query}`;
+        console.log(`[Web Search] Compliance-only search for: "${searchQuery}"`);
       }
+    } else {
+      console.log(`[Web Search] General search for: "${searchQuery}"`);
     }
     
-    const response = await fetch(`https://serpapi.com/search?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${serpApiKey}&num=5`);
-    if (!response.ok) throw new Error('SERP API failed');
+    const url = `https://serpapi.com/search?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${serpApiKey}&num=5`;
+    console.log(`[Web Search] Calling SERP API...`);
+    
+    const response = await fetch(url);
+    console.log(`[Web Search] SERP API status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Web Search] SERP API error response: ${errorText}`);
+      throw new Error(`SERP API failed with status ${response.status}`);
+    }
     
     const data = await response.json();
-    return (data.organic_results || []).slice(0, 5).map(r => ({
+    console.log(`[Web Search] Got ${data.organic_results?.length || 0} results`);
+    
+    const results = (data.organic_results || []).slice(0, 5).map(r => ({
       type: 'web',
       title: r.title,
       url: r.link,
       snippet: r.snippet
     }));
+    
+    console.log(`[Web Search] Returning ${results.length} formatted results`);
+    return results;
   } catch (error) {
-    console.error('Web search error:', error);
+    console.error('[Web Search] Error:', error.message);
     return [];
   }
 }
