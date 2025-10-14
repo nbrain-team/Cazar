@@ -1,40 +1,123 @@
 import https from 'https';
-import crypto from 'crypto';
+import querystring from 'querystring';
 
 // ADP API configuration
+const ADP_AUTH_BASE = 'https://accounts.adp.com';
 const ADP_API_BASE = 'https://api.adp.com';
 
-// Load certificate and key from environment variables
-function getCertificateConfig() {
+// Token cache
+let tokenCache = {
+  token: null,
+  expiresAt: null
+};
+
+// Load OAuth credentials and certificate from environment
+function getADPCredentials() {
+  const clientId = process.env.ADP_CLIENT_ID;
+  const clientSecret = process.env.ADP_CLIENT_SECRET;
   const cert = process.env.ADP_CERTIFICATE;
   const key = process.env.ADP_PRIVATE_KEY;
   
+  if (!clientId || !clientSecret) {
+    throw new Error('ADP_CLIENT_ID or ADP_CLIENT_SECRET not configured in environment');
+  }
   if (!cert || !key) {
-    throw new Error('ADP certificate or private key not configured in environment');
+    throw new Error('ADP_CERTIFICATE or ADP_PRIVATE_KEY not configured in environment');
   }
   
-  // Log certificate info (but not the actual certificate for security)
-  const certPreview = cert.substring(0, 50) + '...' + cert.substring(cert.length - 50);
-  console.log(`[ADP] Certificate loaded: ${cert.length} characters, starts with: ${cert.substring(0, 30)}...`);
-  console.log(`[ADP] Private key loaded: ${key.length} characters`);
-  
-  // Check if certificate appears valid
-  if (!cert.includes('-----BEGIN CERTIFICATE-----') || !cert.includes('-----END CERTIFICATE-----')) {
-    console.warn('[ADP] WARNING: Certificate does not appear to be in valid PEM format');
-  }
-  if (!key.includes('-----BEGIN PRIVATE KEY-----') || !key.includes('-----END PRIVATE KEY-----')) {
-    console.warn('[ADP] WARNING: Private key does not appear to be in valid PEM format');
+  return { clientId, clientSecret, cert, key };
+}
+
+// Get OAuth access token (with caching)
+async function getAccessToken() {
+  // Return cached token if still valid (with 5 minute buffer)
+  if (tokenCache.token && tokenCache.expiresAt && Date.now() < tokenCache.expiresAt - 300000) {
+    console.log('[ADP OAuth] Using cached access token');
+    return tokenCache.token;
   }
   
-  return { cert, key };
+  console.log('[ADP OAuth] Requesting new access token...');
+  
+  return new Promise((resolve, reject) => {
+    try {
+      const { clientId, clientSecret, cert, key } = getADPCredentials();
+      
+      const postData = querystring.stringify({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret
+      });
+      
+      const url = new URL('/auth/oauth/v2/token', ADP_AUTH_BASE);
+      
+      const options = {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        cert,
+        key,
+        rejectUnauthorized: true,
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.access_token;
+              const expiresIn = parsed.expires_in || 3600; // Default 1 hour
+              
+              // Cache the token
+              tokenCache.token = token;
+              tokenCache.expiresAt = Date.now() + (expiresIn * 1000);
+              
+              console.log(`[ADP OAuth] ✅ Access token obtained, expires in ${expiresIn}s`);
+              resolve(token);
+            } catch (err) {
+              reject(new Error(`Failed to parse token response: ${err.message}`));
+            }
+          } else {
+            console.error(`[ADP OAuth] Token request failed: ${res.statusCode}`);
+            console.error(`[ADP OAuth] Response: ${data}`);
+            reject(new Error(`OAuth token request failed: ${res.statusCode}`));
+          }
+        });
+      });
+      
+      req.on('error', (err) => {
+        console.error(`[ADP OAuth] Request error: ${err.message}`);
+        reject(err);
+      });
+      
+      req.write(postData);
+      req.end();
+    } catch (error) {
+      console.error(`[ADP OAuth] Setup error: ${error.message}`);
+      reject(error);
+    }
+  });
 }
 
 // Make authenticated request to ADP API
-async function makeADPRequest(endpoint, method = 'GET', body = null) {
-  return new Promise((resolve, reject) => {
-    try {
-      console.log(`[ADP API] Making ${method} request to: ${endpoint}`);
-      const { cert, key } = getCertificateConfig();
+async function makeADPRequest(endpoint, method = 'GET', body = null, additionalHeaders = {}) {
+  try {
+    const accessToken = await getAccessToken();
+    const { cert, key } = getADPCredentials();
+    
+    console.log(`[ADP API] Making ${method} request to: ${endpoint}`);
+    
+    return new Promise((resolve, reject) => {
       const url = new URL(endpoint, ADP_API_BASE);
       
       const options = {
@@ -43,8 +126,10 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
         path: url.pathname + url.search,
         method,
         headers: {
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...additionalHeaders
         },
         cert,
         key,
@@ -69,24 +154,21 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
           
           try {
             const parsed = JSON.parse(data);
-            console.log(`[ADP API] Successfully parsed JSON response with ${Object.keys(parsed).length} keys`);
             
-            // If authentication error, reject with detailed message
-            if (res.statusCode === 401) {
-              const errorMsg = parsed.response?.error?.message || parsed.error?.message || parsed.message || 'Authentication failed';
-              reject(new Error(`ADP API Authentication Failed (401): ${errorMsg}. Certificate may be expired or invalid.`));
-              return;
-            }
-            
-            // For other errors, log but continue
-            if (res.statusCode >= 400) {
+            if (res.statusCode === 200) {
+              console.log(`[ADP API] ✅ Success`);
+              resolve(parsed);
+            } else {
               console.error(`[ADP API] API returned error status ${res.statusCode}`);
+              reject(new Error(`ADP API error ${res.statusCode}: ${JSON.stringify(parsed)}`));
             }
-            
-            resolve(parsed);
           } catch (err) {
-            console.log(`[ADP API] Failed to parse JSON, returning raw data`);
-            resolve({ raw: data });
+            if (res.statusCode === 200) {
+              console.log(`[ADP API] Non-JSON response, returning raw data`);
+              resolve({ raw: data });
+            } else {
+              reject(new Error(`ADP API error ${res.statusCode}: ${data}`));
+            }
           }
         });
       });
@@ -101,83 +183,36 @@ async function makeADPRequest(endpoint, method = 'GET', body = null) {
       }
       
       req.end();
-    } catch (error) {
-      console.error(`[ADP API] Setup error: ${error.message}`);
-      reject(error);
-    }
-  });
-}
-
-// Search payroll data
-export async function searchPayroll(query, options = {}) {
-  try {
-    console.log(`[ADP Payroll] Searching with options:`, options);
-    const { startDate, endDate, employeeId } = options;
-    
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (employeeId) params.append('associateOID', employeeId);
-    
-    const endpoint = `/payroll/v1/payroll-output?${params.toString()}`;
-    const response = await makeADPRequest(endpoint);
-    
-    // Parse and format payroll data
-    const results = [];
-    
-    if (response.payrollOutput) {
-      console.log(`[ADP Payroll] Found ${response.payrollOutput.length} payroll records`);
-      for (const payroll of response.payrollOutput) {
-        const employee = payroll.worker?.person;
-        const earnings = payroll.payDistribution?.earnings || [];
-        
-        const totalGross = earnings.reduce((sum, e) => sum + (parseFloat(e.amount?.value) || 0), 0);
-        
-        results.push({
-          type: 'payroll',
-          title: `Payroll for ${employee?.legalName?.formattedName || 'Unknown'}`,
-          employeeId: payroll.worker?.associateOID,
-          employeeName: employee?.legalName?.formattedName,
-          payDate: payroll.payDate,
-          grossPay: totalGross,
-          snippet: `Total gross pay: $${totalGross.toFixed(2)} on ${payroll.payDate}`,
-        });
-      }
-    } else {
-      console.log(`[ADP Payroll] No payrollOutput in response. Response keys: ${Object.keys(response).join(', ')}`);
-    }
-    
-    console.log(`[ADP Payroll] Returning ${results.length} results`);
-    return results;
+    });
   } catch (error) {
-    console.error('[ADP Payroll] Search error:', error.message, error.stack);
-    return [];
+    console.error(`[ADP API] Error: ${error.message}`);
+    throw error;
   }
 }
 
-// Get employee/worker information
-export async function searchEmployees(query) {
+// Get all workers
+export async function searchEmployees(query = '') {
   try {
     console.log(`[ADP Employees] Searching for: "${query}"`);
-    // Search workers by name or ID
-    const endpoint = '/hr/v2/workers';
-    const response = await makeADPRequest(endpoint);
+    
+    const response = await makeADPRequest('/hr/v2/workers');
     
     const results = [];
     
-    if (response.workers) {
+    if (response.workers && Array.isArray(response.workers)) {
       console.log(`[ADP Employees] Found ${response.workers.length} total workers`);
-      const filtered = response.workers.filter(worker => {
+      
+      // Filter by query if provided
+      const filtered = query ? response.workers.filter(worker => {
         const name = worker.person?.legalName?.formattedName || '';
         const id = worker.associateOID || '';
         return name.toLowerCase().includes(query.toLowerCase()) || 
                id.toLowerCase().includes(query.toLowerCase());
-      });
+      }) : response.workers;
       
       console.log(`[ADP Employees] ${filtered.length} workers match query`);
       
-      for (const worker of filtered.slice(0, 5)) {
+      for (const worker of filtered.slice(0, 10)) {  // Limit to 10 results
         const person = worker.person;
         const employment = worker.businessCommunication?.emails?.[0];
         
@@ -192,107 +227,93 @@ export async function searchEmployees(query) {
         });
       }
     } else {
-      console.log(`[ADP Employees] No workers in response. Response keys: ${Object.keys(response).join(', ')}`);
+      console.log(`[ADP Employees] No workers in response`);
     }
     
     console.log(`[ADP Employees] Returning ${results.length} results`);
     return results;
   } catch (error) {
-    console.error('[ADP Employees] Search error:', error.message, error.stack);
+    console.error('[ADP Employees] Search error:', error.message);
     return [];
   }
 }
 
-// Get time and attendance data
-export async function searchTimeAndAttendance(query, options = {}) {
+// Get worker timecards
+export async function searchTimeCards(query, options = {}) {
   try {
-    const { startDate, endDate, employeeId } = options;
+    console.log(`[ADP Timecards] Searching timecards for query: "${query}"`);
     
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    if (employeeId) params.append('associateOID', employeeId);
+    // First, get workers to find AOIDs
+    const workersResponse = await makeADPRequest('/hr/v2/workers');
     
-    const endpoint = `/time/v2/time-cards?${params.toString()}`;
-    const response = await makeADPRequest(endpoint);
+    if (!workersResponse.workers || workersResponse.workers.length === 0) {
+      console.log('[ADP Timecards] No workers found');
+      return [];
+    }
+    
+    console.log(`[ADP Timecards] Found ${workersResponse.workers.length} workers, checking timecards...`);
     
     const results = [];
     
-    if (response.timeCards) {
-      for (const timeCard of response.timeCards) {
-        const employee = timeCard.worker?.person;
-        const entries = timeCard.timeCardEntries || [];
+    // Get timecards for first few active workers
+    const activeWorkers = workersResponse.workers
+      .filter(w => w.workerStatus?.statusCode?.codeValue === 'Active')
+      .slice(0, 5);
+    
+    for (const worker of activeWorkers) {
+      try {
+        const aoid = worker.associateOID;
+        const endpoint = `/time/v2/workers/${aoid}/team-time-cards`;
         
-        const totalHours = entries.reduce((sum, entry) => {
-          const hours = parseFloat(entry.duration?.hours) || 0;
-          return sum + hours;
-        }, 0);
+        const timecardsResponse = await makeADPRequest(endpoint, 'GET', null, { 'roleCode': 'employee' });
         
-        results.push({
-          type: 'timecard',
-          title: `Timecard for ${employee?.legalName?.formattedName || 'Unknown'}`,
-          employeeId: timeCard.worker?.associateOID,
-          employeeName: employee?.legalName?.formattedName,
-          startDate: timeCard.timeCardPeriod?.startDate,
-          endDate: timeCard.timeCardPeriod?.endDate,
-          totalHours,
-          snippet: `Total hours: ${totalHours.toFixed(2)} from ${timeCard.timeCardPeriod?.startDate} to ${timeCard.timeCardPeriod?.endDate}`,
-        });
+        if (timecardsResponse.teamTimeCards && timecardsResponse.teamTimeCards.length > 0) {
+          console.log(`[ADP Timecards] Found ${timecardsResponse.teamTimeCards.length} timecards for ${worker.person?.legalName?.formattedName}`);
+          
+          timecardsResponse.teamTimeCards.forEach(timecard => {
+            results.push({
+              type: 'timecard',
+              title: `Timecard for ${worker.person?.legalName?.formattedName || 'Unknown'}`,
+              employeeId: aoid,
+              employeeName: worker.person?.legalName?.formattedName,
+              period: `${timecard.timePeriod?.startDate || 'N/A'} to ${timecard.timePeriod?.endDate || 'N/A'}`,
+              status: timecard.timeCardStatus?.statusCode?.codeValue || 'Unknown',
+              snippet: `Timecard period: ${timecard.timePeriod?.startDate || 'N/A'} to ${timecard.timePeriod?.endDate || 'N/A'} - Status: ${timecard.timeCardStatus?.statusCode?.codeValue || 'Unknown'}`,
+            });
+          });
+        }
+      } catch (err) {
+        // Skip workers that fail (e.g., missing supervisor)
+        console.log(`[ADP Timecards] Skipping worker ${worker.associateOID}: ${err.message}`);
       }
     }
     
+    console.log(`[ADP Timecards] Returning ${results.length} total timecard results`);
     return results;
   } catch (error) {
-    console.error('ADP time and attendance search error:', error);
+    console.error('[ADP Timecards] Search error:', error.message);
     return [];
   }
 }
 
-// Main search function that tries multiple ADP endpoints
+// Main search function
 export async function searchADP(query, options = {}) {
   try {
     console.log(`[ADP] Starting search for query: "${query}"`);
     console.log(`[ADP] Options provided:`, options);
     
-    // Determine what to search based on query keywords
     const lowerQuery = query.toLowerCase();
     const searches = [];
     
-    // Infer date ranges if query mentions "last week", "last month", etc.
-    let inferredOptions = { ...options };
-    if (lowerQuery.includes('last week') || lowerQuery.includes('recent week') || lowerQuery.includes('this week')) {
-      const endDate = new Date();
-      const startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - 7);
-      inferredOptions.startDate = formatADPDate(startDate);
-      inferredOptions.endDate = formatADPDate(endDate);
-      console.log(`[ADP] Inferred date range for "last week": ${inferredOptions.startDate} to ${inferredOptions.endDate}`);
-    } else if (lowerQuery.includes('last month') || lowerQuery.includes('recent month')) {
-      const endDate = new Date();
-      const startDate = new Date(endDate);
-      startDate.setMonth(startDate.getMonth() - 1);
-      inferredOptions.startDate = formatADPDate(startDate);
-      inferredOptions.endDate = formatADPDate(endDate);
-      console.log(`[ADP] Inferred date range for "last month": ${inferredOptions.startDate} to ${inferredOptions.endDate}`);
-    }
-    
-    // Always search employees for general queries
+    // Always search employees
     console.log('[ADP] Searching employees...');
     searches.push(searchEmployees(query));
     
-    // Search payroll if query mentions pay, salary, wages, etc.
-    if (lowerQuery.includes('payroll') || lowerQuery.includes('pay') || 
-        lowerQuery.includes('salary') || lowerQuery.includes('wage') ||
-        lowerQuery.includes('earnings') || lowerQuery.includes('compensation')) {
-      console.log('[ADP] Searching payroll...');
-      searches.push(searchPayroll(query, inferredOptions));
-    }
-    
-    // Search time & attendance if query mentions hours, time, attendance, etc.
+    // Search timecards if query mentions hours, time, timecard, etc.
     if (lowerQuery.includes('hours') || lowerQuery.includes('time') || 
-        lowerQuery.includes('attendance') || lowerQuery.includes('timecard')) {
-      console.log('[ADP] Searching time & attendance...');
-      searches.push(searchTimeAndAttendance(query, inferredOptions));
+        lowerQuery.includes('timecard') || lowerQuery.includes('attendance')) {
+      console.log('[ADP] Searching timecards...');
+      searches.push(searchTimeCards(query, options));
     }
     
     console.log(`[ADP] Running ${searches.length} searches in parallel...`);
@@ -313,37 +334,53 @@ export async function searchADP(query, options = {}) {
     console.log(`[ADP] Found ${allResults.length} total results`);
     return allResults.slice(0, 10);
   } catch (error) {
-    console.error('[ADP] Main search error:', error.message, error.stack);
-    // Return informative error result instead of throwing
+    console.error('[ADP] Main search error:', error.message);
     return [{
       type: 'adp',
       title: 'ADP API Error',
-      snippet: `ADP certificate authentication configured. Connection error: ${error.message}. Check if certificate is valid and ADP API endpoints are accessible.`,
+      snippet: `Error connecting to ADP: ${error.message}`,
     }];
   }
 }
 
-// Helper function to format dates for ADP API
-export function formatADPDate(date) {
-  return date.toISOString().split('T')[0];
-}
-
-// Get payroll summary for a date range
-export async function getPayrollSummary(startDate, endDate) {
+// Helper to get summary data
+export async function getADPSummary() {
   try {
-    const results = await searchPayroll('', { startDate, endDate });
+    console.log('[ADP Summary] Fetching summary data...');
+    
+    const response = await makeADPRequest('/hr/v2/workers');
+    
+    if (!response.workers) {
+      return {
+        totalWorkers: 0,
+        activeWorkers: 0,
+        terminatedWorkers: 0
+      };
+    }
+    
+    const workers = response.workers;
+    const activeWorkers = workers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Active');
+    const terminatedWorkers = workers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Terminated');
     
     const summary = {
-      totalEmployees: results.length,
-      totalGrossPay: results.reduce((sum, r) => sum + (r.grossPay || 0), 0),
-      payPeriod: { startDate, endDate },
-      employees: results,
+      totalWorkers: workers.length,
+      activeWorkers: activeWorkers.length,
+      terminatedWorkers: terminatedWorkers.length,
+      recentHires: workers
+        .filter(w => w.workerDates?.originalHireDate)
+        .sort((a, b) => new Date(b.workerDates.originalHireDate) - new Date(a.workerDates.originalHireDate))
+        .slice(0, 5)
+        .map(w => ({
+          name: w.person?.legalName?.formattedName || 'Unknown',
+          hireDate: w.workerDates?.originalHireDate,
+          id: w.associateOID
+        }))
     };
     
+    console.log('[ADP Summary] Summary generated:', summary);
     return summary;
   } catch (error) {
-    console.error('ADP payroll summary error:', error);
+    console.error('[ADP Summary] Error:', error.message);
     throw error;
   }
 }
-
