@@ -31,7 +31,6 @@ const DATA_SOURCES: DataSource[] = [
 export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   
   // New user form state
@@ -240,7 +239,7 @@ export default function AdminPage() {
                   <td style={{ padding: '1rem', textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                       <button
-                        onClick={() => setEditingUser(user)}
+                        onClick={() => alert('Edit functionality coming soon!')}
                         style={{
                           padding: '0.5rem',
                           background: 'transparent',
