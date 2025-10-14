@@ -2289,12 +2289,14 @@ app.post('/api/smart-agent/chat', async (req, res) => {
 - ADP Payroll system
 
 Your role is to:
-1. Provide accurate, well-formatted answers using available data
+1. Provide accurate, well-formatted answers using ONLY the data provided in context below
 2. Cite sources clearly for all information
 3. Format responses in clean Markdown with tables where appropriate
 4. Be conversational but professional
-5. If information is not available, clearly state that
+5. If information is not available in the context, clearly state that you don't have access to that data
 6. Focus on operations, compliance, payroll, and logistics topics
+
+**CRITICAL: NEVER generate mock, fake, or example data. If you don't have the real data from the context below, say so explicitly. Do NOT make up names, dates, or any other information.**
 
 Context from search:
 ${contextSources.join('\n\n')}

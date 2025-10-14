@@ -11,6 +11,45 @@ let tokenCache = {
   expiresAt: null
 };
 
+// Clean and format PEM certificate/key
+function cleanPEM(pem, type = 'CERTIFICATE') {
+  // Remove quotes
+  if (pem.startsWith('"') && pem.endsWith('"')) {
+    pem = pem.slice(1, -1);
+  }
+  
+  // Convert literal \n to actual newlines
+  pem = pem.replace(/\\n/g, '\n');
+  
+  // Extract just the base64 content (remove headers/footers if present)
+  const beginMarker = `-----BEGIN ${type}-----`;
+  const endMarker = `-----END ${type}-----`;
+  
+  let base64Content = pem;
+  if (pem.includes(beginMarker)) {
+    base64Content = pem.split(beginMarker)[1];
+  }
+  if (base64Content.includes(endMarker)) {
+    base64Content = base64Content.split(endMarker)[0];
+  }
+  
+  // Clean the base64 content: remove all whitespace, newlines, etc.
+  base64Content = base64Content.replace(/[\s\n\r]/g, '');
+  
+  // Reconstruct with proper format: header + base64 in 64-char lines + footer
+  const lines = [];
+  lines.push(beginMarker);
+  
+  // Split base64 into 64-character lines (standard PEM format)
+  for (let i = 0; i < base64Content.length; i += 64) {
+    lines.push(base64Content.substring(i, i + 64));
+  }
+  
+  lines.push(endMarker);
+  
+  return lines.join('\n');
+}
+
 // Load OAuth credentials and certificate from environment
 function getADPCredentials() {
   const clientId = process.env.ADP_CLIENT_ID;
@@ -25,51 +64,12 @@ function getADPCredentials() {
     throw new Error('ADP_CERTIFICATE or ADP_PRIVATE_KEY not configured in environment');
   }
   
-  // Remove any surrounding quotes first (before converting newlines)
-  if (cert.startsWith('"') && cert.endsWith('"')) {
-    cert = cert.slice(1, -1);
-  }
-  if (key.startsWith('"') && key.endsWith('"')) {
-    key = key.slice(1, -1);
-  }
+  // Clean and properly format the PEM files
+  cert = cleanPEM(cert, 'CERTIFICATE');
+  key = cleanPEM(key, 'PRIVATE KEY');
   
-  // Convert literal \n to actual newlines (common issue with environment variables)
-  cert = cert.replace(/\\n/g, '\n');
-  key = key.replace(/\\n/g, '\n');
-  
-  // Trim any leading/trailing whitespace from the certificate body
-  cert = cert.trim();
-  key = key.trim();
-  
-  // If certificate doesn't start with header, add it (Render might strip it)
-  if (!cert.startsWith('-----BEGIN CERTIFICATE-----')) {
-    console.log('[ADP] Certificate missing header, reconstructing...');
-    cert = '-----BEGIN CERTIFICATE-----\n' + cert;
-  } else if (!cert.startsWith('-----BEGIN CERTIFICATE-----\n')) {
-    // Header exists but missing newline after it
-    cert = cert.replace('-----BEGIN CERTIFICATE-----', '-----BEGIN CERTIFICATE-----\n');
-  }
-  if (!cert.endsWith('-----END CERTIFICATE-----')) {
-    if (!cert.endsWith('\n')) cert += '\n';
-    cert += '-----END CERTIFICATE-----';
-  }
-  
-  // Same for private key
-  if (!key.startsWith('-----BEGIN PRIVATE KEY-----')) {
-    console.log('[ADP] Private key missing header, reconstructing...');
-    key = '-----BEGIN PRIVATE KEY-----\n' + key;
-  } else if (!key.startsWith('-----BEGIN PRIVATE KEY-----\n')) {
-    // Header exists but missing newline after it
-    console.log('[ADP] Private key missing newline after header, fixing...');
-    key = key.replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n');
-  }
-  if (!key.endsWith('-----END PRIVATE KEY-----')) {
-    if (!key.endsWith('\n')) key += '\n';
-    key += '-----END PRIVATE KEY-----';
-  }
-  
-  console.log('[ADP] Certificate loaded:', cert.substring(0, 30) + '...', `(${cert.length} chars)`);
-  console.log('[ADP] Private key loaded:', key.substring(0, 30) + '...', `(${key.length} chars)`);
+  console.log('[ADP] Certificate cleaned and formatted:', cert.substring(0, 30) + '...', `(${cert.length} chars)`);
+  console.log('[ADP] Private key cleaned and formatted:', key.substring(0, 30) + '...', `(${key.length} chars)`);
   
   return { clientId, clientSecret, cert, key };
 }
