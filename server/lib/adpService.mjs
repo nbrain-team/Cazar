@@ -350,12 +350,40 @@ export async function searchADP(query, options = {}) {
     
     const lowerQuery = query.toLowerCase();
     
-    // Check if query is asking for summary/recent hires
-    if (lowerQuery.includes('recent hire') || lowerQuery.includes('new hire') ||
-        lowerQuery.includes('summarize') || lowerQuery.includes('summary') ||
-        lowerQuery.includes('overview') || lowerQuery.includes('workforce')) {
-      console.log('[ADP] Query requesting summary/recent hires, fetching summary data...');
+    // Check if query is asking for summary/employee list/recent hires
+    const isSummaryQuery = 
+      lowerQuery.includes('recent hire') || lowerQuery.includes('new hire') ||
+      lowerQuery.includes('summarize') || lowerQuery.includes('summary') ||
+      lowerQuery.includes('overview') || lowerQuery.includes('workforce') ||
+      (lowerQuery.includes('list') && lowerQuery.includes('employee')) ||
+      (lowerQuery.includes('all') && lowerQuery.includes('employee')) ||
+      (lowerQuery.includes('current') && lowerQuery.includes('employee')) ||
+      (lowerQuery.includes('active') && lowerQuery.includes('employee')) ||
+      (lowerQuery.includes('show') && lowerQuery.includes('employee')) ||
+      lowerQuery.includes('how many employee') ||
+      lowerQuery.includes('employee list') ||
+      lowerQuery.includes('staff list') ||
+      lowerQuery.includes('team roster');
+    
+    if (isSummaryQuery) {
+      console.log('[ADP] Query requesting employee list/summary, fetching all employees...');
       
+      // If asking for "all" or "current" employees, get full employee list
+      if (lowerQuery.includes('list') || lowerQuery.includes('all') || 
+          lowerQuery.includes('current') || lowerQuery.includes('active')) {
+        console.log('[ADP] Fetching complete employee list...');
+        const employees = await searchEmployees(''); // Empty string returns all
+        
+        // Filter for active employees if query specifies "current" or "active"
+        const filteredEmployees = (lowerQuery.includes('current') || lowerQuery.includes('active'))
+          ? employees.filter(e => e.status === 'Active')
+          : employees;
+        
+        console.log(`[ADP] Returning ${filteredEmployees.length} employees`);
+        return filteredEmployees;
+      }
+      
+      // Otherwise, return summary with recent hires
       const summary = await getADPSummary();
       const results = [];
       
