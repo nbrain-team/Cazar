@@ -2005,12 +2005,12 @@ let complianceUrls = [
   { url: 'https://www.dol.gov/agencies/whd', category: 'DOL Wage & Hour', enabled: true }
 ];
 
-// Helper: Search web via SERP API
+// Helper: Search web via Serper.dev API
 async function searchWeb(query, complianceOnly = false) {
   try {
-    const serpApiKey = process.env.SERP_API_KEY;
-    if (!serpApiKey) {
-      console.log('[Web Search] SERP API key not configured');
+    const serperApiKey = process.env.SERPER_API_KEY || process.env.SERP_API_KEY;
+    if (!serperApiKey) {
+      console.log('[Web Search] Serper API key not configured');
       return [];
     }
     
@@ -2026,22 +2026,32 @@ async function searchWeb(query, complianceOnly = false) {
       console.log(`[Web Search] General search for: "${searchQuery}"`);
     }
     
-    const url = `https://serpapi.com/search?engine=google&q=${encodeURIComponent(searchQuery)}&api_key=${serpApiKey}&num=5`;
-    console.log(`[Web Search] Calling SERP API...`);
+    console.log(`[Web Search] Calling Serper.dev API...`);
     
-    const response = await fetch(url);
-    console.log(`[Web Search] SERP API status: ${response.status}`);
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperApiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: searchQuery,
+        num: 5
+      })
+    });
+    
+    console.log(`[Web Search] Serper.dev status: ${response.status}`);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[Web Search] SERP API error response: ${errorText}`);
-      throw new Error(`SERP API failed with status ${response.status}`);
+      console.error(`[Web Search] Serper.dev error response: ${errorText}`);
+      throw new Error(`Serper.dev API failed with status ${response.status}`);
     }
     
     const data = await response.json();
-    console.log(`[Web Search] Got ${data.organic_results?.length || 0} results`);
+    console.log(`[Web Search] Got ${data.organic?.length || 0} results`);
     
-    const results = (data.organic_results || []).slice(0, 5).map(r => ({
+    const results = (data.organic || []).slice(0, 5).map(r => ({
       type: 'web',
       title: r.title,
       url: r.link,
