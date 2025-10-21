@@ -2116,6 +2116,8 @@ async function searchPostgres(query, pool) {
       const isActiveQuery = qLower.includes('active');
       const isEmployeeQuery = qLower.includes('driver') || qLower.includes('employee') || qLower.includes('worker');
       const isRecentQuery = qLower.includes('recent') || qLower.includes('new') || qLower.includes('hire');
+      const isBreakQuery = (qLower.includes('break') || qLower.includes('lunch') || qLower.includes('meal')) && 
+                          (qLower.includes('6 hour') || qLower.includes('consecutive') || qLower.includes('without') || qLower.includes('exceed'));
       
       // Handle statistical queries
       if (isCountQuery && isEmployeeQuery) {
@@ -2142,6 +2144,59 @@ async function searchPostgres(query, pool) {
         };
         
         console.log('[DB] Statistics:', results.statistics);
+      }
+      
+      // Handle break violation queries
+      if (isBreakQuery) {
+        console.log('[DB] Detected break/meal violation query');
+        
+        // Find drivers who worked 6+ consecutive hours without a break
+        const { rows: violations } = await client.query(`
+          WITH driver_days AS (
+            SELECT 
+              driver_id,
+              DATE(start_utc) as work_date,
+              MIN(start_utc) as day_start,
+              MAX(end_utc) as day_end,
+              SUM(minutes) as total_minutes
+            FROM on_duty_segments
+            WHERE duty_type = 'worked'
+            GROUP BY driver_id, DATE(start_utc)
+            HAVING SUM(minutes) >= 360  -- 6 hours = 360 minutes
+          ),
+          breaks_by_day AS (
+            SELECT 
+              driver_id,
+              DATE(start_utc) as work_date,
+              COUNT(*) as break_count,
+              SUM(minutes) as total_break_minutes
+            FROM break_segments
+            WHERE label ILIKE '%lunch%' OR label ILIKE '%break%' OR label ILIKE '%meal%'
+            GROUP BY driver_id, DATE(start_utc)
+          )
+          SELECT 
+            d.driver_id,
+            dr.driver_name,
+            dd.work_date,
+            dd.total_minutes,
+            COALESCE(bb.break_count, 0) as break_count,
+            COALESCE(bb.total_break_minutes, 0) as break_minutes
+          FROM driver_days dd
+          JOIN drivers d ON d.driver_id = dd.driver_id
+          LEFT JOIN drivers dr ON dr.driver_id = dd.driver_id
+          LEFT JOIN breaks_by_day bb ON bb.driver_id = dd.driver_id AND bb.work_date = dd.work_date
+          WHERE dd.total_minutes >= 360 AND COALESCE(bb.break_count, 0) = 0
+          ORDER BY dd.work_date DESC, dd.total_minutes DESC
+          LIMIT 20
+        `);
+        
+        if (violations.length > 0) {
+          results.violations = violations;
+          console.log(`[DB] Found ${violations.length} break violations`);
+        } else {
+          results.violations = [];
+          console.log('[DB] No break violations found');
+        }
       }
       
       // Handle "recent hires" queries
@@ -2289,12 +2344,31 @@ app.post('/api/smart-agent/chat', async (req, res) => {
           });
         }
         if (pgResults.violations.length > 0) {
-          contextSources.push(`[Database] Found ${pgResults.violations.length} recent violations`);
-          sources.push({
-            type: 'database',
-            title: 'Recent Violations',
-            snippet: `${pgResults.violations.length} compliance violations found in system`
-          });
+          // Check if these are break violations or compliance violations
+          const firstViolation = pgResults.violations[0];
+          if (firstViolation.work_date && firstViolation.total_minutes) {
+            // Break violations
+            const violationsList = pgResults.violations.map(v => 
+              `${v.driver_name || v.driver_id} on ${new Date(v.work_date).toLocaleDateString()}: worked ${(v.total_minutes / 60).toFixed(1)} hours with ${v.break_count} breaks (${v.break_minutes} mins)`
+            ).join('; ');
+            contextSources.push(`[Database Break Violations] Found ${pgResults.violations.length} drivers who worked 6+ hours without proper breaks: ${violationsList}`);
+            
+            pgResults.violations.forEach(v => {
+              sources.push({
+                type: 'database',
+                title: `Break Violation: ${v.driver_name || v.driver_id}`,
+                snippet: `Worked ${(v.total_minutes / 60).toFixed(1)} hours on ${new Date(v.work_date).toLocaleDateString()} with no lunch break`
+              });
+            });
+          } else {
+            // Regular compliance violations
+            contextSources.push(`[Database] Found ${pgResults.violations.length} recent violations`);
+            sources.push({
+              type: 'database',
+              title: 'Recent Violations',
+              snippet: `${pgResults.violations.length} compliance violations found in system`
+            });
+          }
         }
         
         // Also search meeting transcripts (ignore if table doesn't exist yet)
