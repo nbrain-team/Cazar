@@ -1,0 +1,142 @@
+═══════════════════════════════════════════════════════════════
+QUICK COPY-PASTE PROMPT FOR OTHER CURSOR PROJECTS
+═══════════════════════════════════════════════════════════════
+
+Copy everything below this line and paste into any Cursor project:
+
+---START OF PROMPT---
+
+Create a professional static HTML showcase page for my module that matches the design and structure of a high-quality technical documentation page.
+
+FILE TO CREATE: public/[module-name]-showcase.html
+
+DESIGN STYLE:
+- Modern gradient purple/blue theme (gradient from #667eea to #764ba2)
+- White content cards with rounded corners and shadows
+- Responsive grid layouts (3-4 columns desktop, 1 column mobile)
+- Smooth hover animations on cards (lift up 5px, increase shadow)
+- Professional sans-serif fonts
+- Emoji icons for visual interest
+- Dark-themed code blocks with syntax highlighting
+
+REQUIRED SECTIONS:
+
+1. HEADER
+   - Large gradient title
+   - Subtitle description
+   - Badge pills showing key features (e.g., "✨ Technology", "🔧 Feature")
+   - Stat boxes in grid: Large number + label (e.g., "7 / Specialized Tools")
+
+2. SYSTEM OVERVIEW
+   - 2-3 paragraph description
+   - 4 statistics boxes showing key metrics
+   - Professional, high-level explanation
+
+3. TECHNOLOGY STACK
+   - Organized by category (AI, Databases, APIs, Backend, Frontend, DevOps)
+   - Each tech as a rounded pill/badge
+   - Flex-wrap layout
+
+4. ARCHITECTURE
+   - Visual flow diagram with numbered steps (1→2→3→4→5→6)
+   - Each step in a card with circular number badge on left
+   - Down arrows (⬇) between steps
+   - Explain the core pattern (RAG, MVC, Microservices, etc.)
+
+5. CORE COMPONENTS/FEATURES
+   - Grid of cards (3 columns)
+   - Each card: Icon, title, description
+   - Hover effects
+   - Border-left accent color
+
+6. DATA SOURCES/INTEGRATIONS (if applicable)
+   - Grid cards showing each integration
+   - Include: Purpose, auth method, capabilities, status
+
+7. DATABASE SCHEMA (if applicable)
+   - Light background section
+   - Each table as a card showing name and key columns
+   - Include record counts
+
+8. API ENDPOINTS (if applicable)
+   - Dark code blocks for endpoints
+   - HTTP method badges (GET/POST color-coded)
+   - JSON request/response examples with syntax highlighting
+
+9. HOW IT WORKS - DETAILED WORKFLOW
+   - Step-by-step walkthrough of a real use case
+   - Numbered flow diagram with 6-10 steps
+   - Show actual data flow through the system
+
+10. CAPABILITIES & USE CASES
+    - Grid of 6+ category cards
+    - Each with bulleted list of specific capabilities
+    - Emoji icons for categories
+
+11. PERFORMANCE & SCALABILITY
+    - Stat boxes for speed/throughput metrics
+    - Grid of optimization features
+
+12. SECURITY & COMPLIANCE
+    - Grid cards covering authentication, data protection, transparency
+    - List specific security measures
+
+13. DEPLOYMENT & INFRASTRUCTURE
+    - Production details (URL, hosting platform, region)
+    - Grid cards: Hosting, Database, CI/CD, Monitoring
+
+14. FUTURE ENHANCEMENTS
+    - Grid of planned features
+    - Shows roadmap
+
+15. FOOTER
+    - Centered, credits, copyright
+
+COLOR PALETTE:
+- Primary: #667eea (purple-blue)
+- Secondary: #764ba2 (purple)
+- Background gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+- Card backgrounds: White
+- Secondary backgrounds: #f5f7fa to #c3cfe2
+- Text: #333 (primary), #666 (secondary)
+- Code blocks: #282c34 background
+- Syntax: Purple (#c678dd), Green (#98c379), Blue (#61afef), Gray (#5c6370)
+
+RESPONSIVE:
+@media (max-width: 768px) - Single column layout, smaller fonts
+
+Here's the specific information for MY module:
+
+MODULE NAME: [Fill in your module name]
+DESCRIPTION: [Fill in what it does]
+KEY STATISTICS: [Fill in metrics - e.g., "1000 users", "50ms response time"]
+
+TECHNOLOGY STACK:
+AI/ML: [List AI technologies]
+Databases: [List databases]
+APIs: [List API integrations]
+Backend: [List backend tech]
+Frontend: [List frontend tech]
+DevOps: [List deployment tools]
+
+MAIN FEATURES: [List 5-10 key features]
+
+DATABASE TABLES: [List main tables with descriptions]
+
+API ENDPOINTS: [List key endpoints]
+
+USE CASES: [List 5-10 real use cases]
+
+Create the complete HTML file matching the professional style described above.
+
+---END OF PROMPT---
+
+═══════════════════════════════════════════════════════════════
+HOW TO USE:
+1. Copy the prompt above (between START and END markers)
+2. Open your other Cursor project
+3. Fill in the bracketed [...] sections with your module details
+4. Paste into Cursor chat
+5. Get a beautiful showcase page matching the same style!
+═══════════════════════════════════════════════════════════════
+
