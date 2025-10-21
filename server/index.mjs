@@ -2108,34 +2108,82 @@ async function searchPostgres(query, pool) {
   try {
     const client = await pool.connect();
     try {
-      // Search drivers
-      const { rows: drivers } = await client.query(
-        `SELECT driver_id, driver_name, driver_status FROM drivers 
-         WHERE driver_name ILIKE $1 OR driver_id ILIKE $1 LIMIT 5`,
-        [`%${query}%`]
-      );
+      const qLower = query.toLowerCase();
+      const results = { drivers: [], violations: [], statistics: null };
+      
+      // Detect count/statistics queries
+      const isCountQuery = qLower.includes('how many') || qLower.includes('count') || qLower.includes('total');
+      const isActiveQuery = qLower.includes('active');
+      const isEmployeeQuery = qLower.includes('driver') || qLower.includes('employee') || qLower.includes('worker');
+      const isRecentQuery = qLower.includes('recent') || qLower.includes('new') || qLower.includes('hire');
+      
+      // Handle statistical queries
+      if (isCountQuery && isEmployeeQuery) {
+        console.log('[DB] Detected count/statistics query about employees');
+        
+        // Get total counts by status
+        const { rows: statusCounts } = await client.query(`
+          SELECT 
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE driver_status = 'active') as active_status,
+            COUNT(*) FILTER (WHERE driver_status = 'inactive') as inactive_status,
+            COUNT(*) FILTER (WHERE employment_status = 'active') as employed_active,
+            COUNT(*) FILTER (WHERE employment_status = 'terminated') as employed_terminated
+          FROM drivers
+        `);
+        
+        const stats = statusCounts[0];
+        results.statistics = {
+          total: parseInt(stats.total),
+          active_driver_status: parseInt(stats.active_status),
+          inactive_driver_status: parseInt(stats.inactive_status),
+          active_employment: parseInt(stats.employed_active),
+          terminated_employment: parseInt(stats.employed_terminated)
+        };
+        
+        console.log('[DB] Statistics:', results.statistics);
+      }
+      
+      // Handle "recent hires" queries
+      if (isRecentQuery && (isEmployeeQuery || qLower.includes('hire'))) {
+        console.log('[DB] Detected recent hires query');
+        const { rows: recentHires } = await client.query(`
+          SELECT driver_id, driver_name, hire_date, employment_status, driver_status
+          FROM drivers
+          WHERE hire_date IS NOT NULL
+          ORDER BY hire_date DESC
+          LIMIT 10
+        `);
+        results.drivers = recentHires;
+      }
+      // Search for specific drivers by name/ID
+      else if (!isCountQuery) {
+        const { rows: drivers } = await client.query(
+          `SELECT driver_id, driver_name, driver_status, employment_status, hire_date 
+           FROM drivers 
+           WHERE driver_name ILIKE $1 OR driver_id ILIKE $1 LIMIT 5`,
+          [`%${query}%`]
+        );
+        results.drivers = drivers;
+      }
       
       // Search violations if query mentions violations/compliance
-      let violations = [];
-      if (query.toLowerCase().includes('violation') || query.toLowerCase().includes('compliance')) {
+      if (qLower.includes('violation') || qLower.includes('compliance')) {
         const { rows } = await client.query(
           `SELECT dv.*, d.driver_name FROM driver_violations dv
            JOIN drivers d ON d.driver_id = dv.transporter_id
            ORDER BY dv.occurred_at DESC LIMIT 5`
         );
-        violations = rows;
+        results.violations = rows;
       }
       
-      return {
-        drivers,
-        violations
-      };
+      return results;
     } finally {
       client.release();
     }
   } catch (error) {
     console.error('PostgreSQL search error:', error);
-    return { drivers: [], violations: [] };
+    return { drivers: [], violations: [], statistics: null };
   }
 }
 
@@ -2207,13 +2255,36 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     if (enabledDatabases.includes('postgres')) {
       try {
         const pgResults = await searchPostgres(message, pool);
+        
+        // Add statistics if available
+        if (pgResults.statistics) {
+          const stats = pgResults.statistics;
+          const statsText = `[Database Statistics] Total employees/drivers: ${stats.total}. ` +
+            `Active (driver_status): ${stats.active_driver_status}. ` +
+            `Inactive (driver_status): ${stats.inactive_driver_status}. ` +
+            `Active (employment_status): ${stats.active_employment}. ` +
+            `Terminated (employment_status): ${stats.terminated_employment}.`;
+          
+          contextSources.push(statsText);
+          sources.push({
+            type: 'database',
+            title: 'Employee Statistics',
+            snippet: `Total: ${stats.total} | Active: ${stats.active_driver_status} | From ADP + existing data`
+          });
+          console.log('[Smart Agent] Added database statistics to context');
+        }
+        
         if (pgResults.drivers.length > 0) {
-          contextSources.push(`[Database] Found ${pgResults.drivers.length} matching drivers: ${pgResults.drivers.map(d => d.driver_name).join(', ')}`);
+          const driversList = pgResults.drivers.map(d => 
+            `${d.driver_name} (ID: ${d.driver_id}, Status: ${d.driver_status}, Employment: ${d.employment_status}${d.hire_date ? ', Hired: ' + new Date(d.hire_date).toLocaleDateString() : ''})`
+          ).join('; ');
+          contextSources.push(`[Database] Found ${pgResults.drivers.length} matching drivers: ${driversList}`);
+          
           pgResults.drivers.forEach(d => {
             sources.push({
               type: 'database',
               title: `Driver: ${d.driver_name}`,
-              snippet: `ID: ${d.driver_id}, Status: ${d.driver_status}`
+              snippet: `ID: ${d.driver_id}, Status: ${d.driver_status}, Employment: ${d.employment_status}`
             });
           });
         }
