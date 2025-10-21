@@ -192,3 +192,4 @@ Once permissions are granted, the Smart Agent will automatically:
 
 No code changes needed - it will just work!
 
+

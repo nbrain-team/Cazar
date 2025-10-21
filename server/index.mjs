@@ -2246,6 +2246,7 @@ async function searchPostgres(query, pool) {
 import { searchMicrosoft365 } from './lib/microsoftGraph.mjs';
 import { searchADP as searchADPService } from './lib/adpService.mjs';
 import { processMeetingTranscript, searchMeetings } from './lib/readAIService.mjs';
+import { runSophisticatedAgent, formatAgentResponse } from './lib/sophisticatedAgent.mjs';
 
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
@@ -2535,6 +2536,70 @@ ${conversationContext}`;
     console.error('Smart Agent error:', error);
     res.status(500).json({ 
       error: 'smart_agent_failed', 
+      detail: error.message 
+    });
+  }
+});
+
+// POST /api/smart-agent/advanced - Sophisticated Multi-Step Agent
+app.post('/api/smart-agent/advanced', async (req, res) => {
+  try {
+    const { message, conversationHistory = [] } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'message_required' });
+    }
+    
+    console.log(`\n🧠 [Sophisticated Agent] Query: "${message}"`);
+    console.log(`📜 Conversation history: ${conversationHistory.length} messages`);
+    
+    // Run the sophisticated agent with multi-step reasoning
+    const result = await runSophisticatedAgent(
+      message,
+      conversationHistory,
+      process.env.DATABASE_URL
+    );
+    
+    // Format the response for user display
+    const formattedResponse = formatAgentResponse(result);
+    
+    // Build sources from tool calls
+    const sources = result.toolCalls.map((call, index) => ({
+      type: 'tool',
+      title: `Step ${index + 1}: ${call.tool.replace(/_/g, ' ').toUpperCase()}`,
+      snippet: call.result.success ? 
+        `${call.result.rowCount || call.result.count || 'Completed'} - ${call.args.explanation || call.args.operation || ''}` : 
+        `Error: ${call.result.error}`
+    }));
+    
+    // Add reasoning transparency
+    if (result.reasoning && result.reasoning.length > 0) {
+      sources.push({
+        type: 'reasoning',
+        title: `Multi-Step Analysis (${result.steps} steps)`,
+        snippet: `Used ${result.toolCalls.length} tools to analyze your question comprehensively`
+      });
+    }
+    
+    console.log(`\n✨ [Sophisticated Agent] Completed in ${result.steps} steps`);
+    console.log(`📊 Tools used: ${result.toolCalls.length}`);
+    
+    res.json({
+      response: formattedResponse,
+      sources: sources.length > 0 ? sources : undefined,
+      metadata: {
+        steps: result.steps,
+        toolsUsed: result.toolCalls.length,
+        model: 'gpt-4-turbo (function-calling)',
+        mode: 'sophisticated'
+      },
+      conversationHistory: result.conversationHistory
+    });
+    
+  } catch (error) {
+    console.error('Sophisticated Agent error:', error);
+    res.status(500).json({ 
+      error: 'sophisticated_agent_failed', 
       detail: error.message 
     });
   }
