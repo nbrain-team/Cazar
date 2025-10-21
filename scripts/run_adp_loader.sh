@@ -74,5 +74,10 @@ T6FuipGtUF7l0kvqYcieTIjE
 -----END PRIVATE KEY-----"
 
 # Run the ADP loader script with arguments
-node scripts/load_adp_reports.mjs "$@"
+# Check if first argument is "check" to run permissions check instead
+if [ "$1" = "check" ]; then
+  node scripts/check_adp_permissions.mjs
+else
+  node scripts/load_adp_reports.mjs "$@"
+fi
 
