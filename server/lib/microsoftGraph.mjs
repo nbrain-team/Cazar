@@ -43,12 +43,17 @@ async function getAccessToken() {
       accessToken = response.accessToken;
       // Set expiry to 5 minutes before actual expiry for safety
       tokenExpiry = Date.now() + ((response.expiresOn?.getTime() || Date.now() + 3600000) - Date.now() - 300000);
+      console.log('[Microsoft] Successfully acquired access token');
       return accessToken;
     }
 
     throw new Error('Failed to acquire access token');
   } catch (error) {
-    console.error('Microsoft Graph auth error:', error);
+    console.error('[Microsoft] Auth error:', error.message);
+    if (error.message?.includes('AADSTS') || error.errorCode) {
+      console.error('[Microsoft] Azure AD error code:', error.errorCode || 'Unknown');
+      console.error('[Microsoft] This likely means admin consent is required or credentials are incorrect');
+    }
     throw error;
   }
 }
