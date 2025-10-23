@@ -175,32 +175,41 @@ export async function fetchAllRecentEmails(options = {}) {
 
     console.log(`[Email Fetch] Fetching emails from last ${hoursBack} hours...`);
     
-    const users = await getMailboxUsers();
-    console.log(`[Email Fetch] Found ${users.length} mailbox users`);
+    // Specify accessible mailboxes to sync
+    // These are the key operations mailboxes that work with Exchange Online
+    const targetMailboxes = [
+      { email: 'jad@cazarnyc.com', name: 'Jad' },
+      { email: 'vinny@cazarnyc.com', name: 'Vinny' },
+      { email: 'Abdul@CazarNYC.com', name: 'Abdul' },
+      { email: 'allan@CazarNYC.com', name: 'Allan Peralta' },
+      { email: 'Allison@CazarNYC.com', name: 'Allison Jalmanzar' }
+    ];
+    
+    console.log(`[Email Fetch] Syncing ${targetMailboxes.length} accessible mailboxes`);
     
     const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
     
     const allEmails = [];
     
-    for (const user of users) {
+    for (const mailbox of targetMailboxes) {
       try {
-        const emails = await fetchUserEmails(user.id, {
+        const emails = await fetchUserEmails(mailbox.email, {
           top: maxPerMailbox,
           filter: `receivedDateTime ge ${since}`,
           orderby: 'receivedDateTime DESC'
         });
         
-        console.log(`[Email Fetch] User ${user.displayName}: ${emails.length} emails`);
+        console.log(`[Email Fetch] ${mailbox.name} (${mailbox.email}): ${emails.length} emails`);
         
         // Add user context to each email
         emails.forEach(email => {
-          email.mailboxOwner = user.displayName;
-          email.mailboxEmail = user.mail || user.userPrincipalName;
+          email.mailboxOwner = mailbox.name;
+          email.mailboxEmail = mailbox.email;
         });
         
         allEmails.push(...emails);
       } catch (error) {
-        console.error(`[Email Fetch] Error for user ${user.displayName}:`, error.message);
+        console.error(`[Email Fetch] Error for ${mailbox.email}:`, error.message);
       }
     }
     
