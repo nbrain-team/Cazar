@@ -2944,20 +2944,33 @@ app.post('/api/email-analytics/sync', async (req, res) => {
         currentDay: 0,
         totalDays: Math.ceil(hoursBack / 24),
         processed: 0,
-        lastUpdate: new Date().toISOString()
+        lastUpdate: new Date().toISOString(),
+        logs: []
       };
       
-      // Run sync in background
-      syncEmails({ hoursBack, maxPerMailbox }).then(result => {
-        currentSyncStatus.inProgress = false;
-        currentSyncStatus.completed = true;
-        currentSyncStatus.result = result;
-        currentSyncStatus.lastUpdate = new Date().toISOString();
-      }).catch(error => {
-        currentSyncStatus.inProgress = false;
-        currentSyncStatus.error = error.message;
-        currentSyncStatus.lastUpdate = new Date().toISOString();
-      });
+      // Run sync in background with detailed logging
+      (async () => {
+        try {
+          console.log('[Background Sync] Starting email sync...');
+          currentSyncStatus.logs.push('Sync started');
+          
+          const result = await syncEmails({ hoursBack, maxPerMailbox });
+          
+          console.log('[Background Sync] Sync completed:', result);
+          currentSyncStatus.inProgress = false;
+          currentSyncStatus.completed = true;
+          currentSyncStatus.result = result;
+          currentSyncStatus.lastUpdate = new Date().toISOString();
+          currentSyncStatus.logs.push(`Completed: ${result.processed} processed`);
+        } catch (error) {
+          console.error('[Background Sync] Sync error:', error);
+          currentSyncStatus.inProgress = false;
+          currentSyncStatus.error = error.message;
+          currentSyncStatus.errorStack = error.stack;
+          currentSyncStatus.lastUpdate = new Date().toISOString();
+          currentSyncStatus.logs.push(`Error: ${error.message}`);
+        }
+      })();
       
       return res.json({
         message: 'Sync started in background',
