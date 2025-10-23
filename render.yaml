@@ -31,3 +31,24 @@ services:
     healthCheckPath: /
     autoDeploy: true
     region: oregon 
+  
+  - type: cron
+    name: adp-timecard-sync
+    runtime: node
+    schedule: "0 6 * * 1"  # Every Monday at 6 AM UTC (2 AM EST)
+    buildCommand: npm install
+    startCommand: node scripts/load_adp_reports.mjs load timecards
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        value: postgresql://cazar_admin:7m0bT1rRf0TCnGYeaDOCujeLmcXGsJke@dpg-d25rt60gjchc73acglmg-a.oregon-postgres.render.com/cazar_ops_hub
+      - key: ADP_CLIENT_ID
+        sync: false
+      - key: ADP_CLIENT_SECRET
+        sync: false
+      - key: ADP_CERTIFICATE
+        sync: false
+      - key: ADP_PRIVATE_KEY
+        sync: false
+    region: oregon
