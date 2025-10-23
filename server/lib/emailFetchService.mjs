@@ -177,9 +177,11 @@ export async function fetchAllRecentEmails(options = {}) {
     
     // Specify accessible mailboxes to sync
     // These are the key operations mailboxes that work with Exchange Online
+    // Note: Rudy's mailbox requires user ID instead of email address
     const targetMailboxes = [
       { email: 'jad@cazarnyc.com', name: 'Jad' },
       { email: 'vinny@cazarnyc.com', name: 'Vinny' },
+      { email: '16869656-e151-4161-bbe4-1cd4d22921cd', name: 'Rudy Cazares' }, // Using user ID for Rudy
       { email: 'Abdul@CazarNYC.com', name: 'Abdul' },
       { email: 'allan@CazarNYC.com', name: 'Allan Peralta' },
       { email: 'Allison@CazarNYC.com', name: 'Allison Jalmanzar' }
@@ -232,9 +234,11 @@ export async function fetchEmailsByDateRange(startDate, endDate, options = {}) {
     } = options;
 
     // Use accessible mailboxes only
+    // Note: Rudy's mailbox requires user ID instead of email address
     const targetMailboxes = [
       { email: 'jad@cazarnyc.com', name: 'Jad' },
       { email: 'vinny@cazarnyc.com', name: 'Vinny' },
+      { email: '16869656-e151-4161-bbe4-1cd4d22921cd', name: 'Rudy Cazares' }, // Using user ID for Rudy
       { email: 'Abdul@CazarNYC.com', name: 'Abdul' },
       { email: 'allan@CazarNYC.com', name: 'Allan Peralta' },
       { email: 'Allison@CazarNYC.com', name: 'Allison Jalmanzar' }
