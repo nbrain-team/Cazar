@@ -262,23 +262,28 @@ export async function syncEmails(options = {}) {
         let daySkipped = 0;
         let dayErrors = 0;
         
-        for (const email of dayEmails) {
+        for (let i = 0; i < dayEmails.length; i++) {
+          const email = dayEmails[i];
           const result = await processAndStoreEmail(email);
           
           if (result.skipped) {
             daySkipped++;
           } else if (result.success) {
             dayProcessed++;
-            // Log every 10 emails
-            if (dayProcessed % 10 === 0) {
-              console.log(`[Email Sync]   Processed ${dayProcessed}/${dayEmails.length} emails...`);
-            }
           } else {
             dayErrors++;
           }
           
-          // Small delay to avoid rate limiting Claude API
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Log progress every 10 emails OR for new emails
+          const totalSoFar = dayProcessed + daySkipped + dayErrors;
+          if (totalSoFar % 10 === 0 || result.success) {
+            console.log(`[Email Sync]   Progress: ${totalSoFar}/${dayEmails.length} (✅ ${dayProcessed} new, ⏭️  ${daySkipped} exists, ❌ ${dayErrors} errors)`);
+          }
+          
+          // Small delay to avoid rate limiting Claude API (only for new emails)
+          if (result.success) {
+            await new Promise(resolve => setTimeout(resolve, 150));
+          }
         }
         
         // Day summary
