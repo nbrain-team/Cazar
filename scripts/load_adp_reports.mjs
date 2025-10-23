@@ -491,33 +491,18 @@ async function loadReport(reportType, client) {
       await loadReport('workers', client);
       await loadReport('timecards', client);
       
-      // Update active status based on timecard activity
-      console.log('\n🔄 Updating active status based on timecard activity...');
-      const inactivated = await client.query(`
+      // Sync driver_status to match employment_status from ADP
+      console.log('\n🔄 Syncing driver_status to match ADP employment_status...');
+      const synced = await client.query(`
         UPDATE drivers
-        SET driver_status = 'inactive', updated_at = NOW()
-        WHERE driver_status = 'active'
-        AND NOT EXISTS (
-          SELECT 1 FROM timecards t 
-          WHERE t.employee_id = drivers.driver_id 
-          AND t.date >= CURRENT_DATE - INTERVAL '14 days'
-        )
-        AND employment_status != 'terminated'
+        SET driver_status = CASE 
+          WHEN employment_status = 'active' THEN 'active'
+          ELSE 'inactive'
+        END,
+        updated_at = NOW()
+        WHERE driver_id LIKE 'G3%'
       `);
-      console.log(`✅ Set ${inactivated.rowCount} drivers to inactive (no recent timecards)`);
-      
-      const activated = await client.query(`
-        UPDATE drivers
-        SET driver_status = 'active', updated_at = NOW()
-        WHERE driver_status = 'inactive'
-        AND EXISTS (
-          SELECT 1 FROM timecards t 
-          WHERE t.employee_id = drivers.driver_id 
-          AND t.date >= CURRENT_DATE - INTERVAL '14 days'
-        )
-        AND employment_status != 'terminated'
-      `);
-      console.log(`✅ Set ${activated.rowCount} drivers to active (have recent timecards)`);
+      console.log(`✅ Synced ${synced.rowCount} ADP drivers to match employment status`);
       
       console.log('\n🎉 Complete! All ADP data loaded successfully.');
       return 'all';
