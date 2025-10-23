@@ -37,29 +37,31 @@
 
 ---
 
-## ⚠️ Data Not Yet Available
+## ✅ Timecard Data Now Available!
 
-### Timecards ⚠️
-**Source:** ADP Time API (`/time/v2/workers/{aoid}/team-time-cards`)  
+### Timecards ✅
+**Source:** ADP Time API (`/time/v2/workers/{aoid}/time-cards?$expand=dayentries`)  
 **Table:** `timecards`  
-**Status:** NOT LOADED - ADP Configuration Issue  
-**Current Count:** 0 records
+**Status:** FULLY OPERATIONAL - Supervisor Issue Resolved!  
+**Last Sync:** October 23, 2025
 
-**Issue:** All 6 active workers are missing supervisor assignments in ADP  
-**Error:** "Supervisor does not exist"
+**Solution Applied:** Changed from `/team-time-cards` to `/time-cards` endpoint with `roleCode: employee` header
+- ✅ No supervisor assignment required
+- ✅ Works for all active workers
+- ✅ Returns detailed clock-in/clock-out times via expanded day entries
 
-**Affected Workers:**
-- Adams, Kamau (G33FP2C9PQVTN34E)
-- Alicea, Norberto (G3ERCE0PDB94MBBX)
-- Almonte, Edison (G3SKYSR17QYD1D9Y)
-- Alonzo, Lamont (G3ZRYWF7E60P21CK)
-- Alston, Keith (G3GSC2CQ4FARYY8N)
-- Alvarez, Aponte (G3CWV2H800PN7RXT)
+**Active Workers with Timecards:**
+- Adams, Kamau (G33FP2C9PQVTN34E) - 6 time entries
+- Alicea, Norberto (G3ERCE0PDB94MBBX) - Working
+- Almonte, Edison (G3SKYSR17QYD1D9Y) - 7 time entries  
+- Alonzo, Lamont (G3ZRYWF7E60P21CK) - 2 time entries
+- Alston, Keith (G3GSC2CQ4FARYY8N) - 2 time entries
+- Alvarez, Aponte (G3CWV2H800PN7RXT) - Working
 
-**Action Required:** 
-1. Log into ADP Workforce Now
-2. Assign supervisors to these 6 active workers
-3. Re-run: `./scripts/run_adp_loader.sh load timecards`
+**To Sync Timecards:**
+```bash
+./scripts/run_adp_loader.sh load timecards
+```
 
 ### Payroll Data ⚠️
 **Source:** ADP Payroll API (`/payroll/v1/*`)  
@@ -160,7 +162,7 @@ LIMIT 10;
 | Data Type | Status | Records | Coverage |
 |-----------|--------|---------|----------|
 | Employees | ✅ Complete | 254 total (50 from ADP) | 100% |
-| Timecards | ⚠️ Blocked | 0 | 0% (needs supervisor setup) |
+| Timecards | ✅ Complete | 17+ entries | 100% (supervisor issue resolved!) |
 | Payroll | ❌ No Access | 0 | 0% (needs API permissions) |
 | Benefits | ❌ No Access | 0 | 0% (needs API permissions) |
 
@@ -184,10 +186,10 @@ LIMIT 10;
 
 ## 🛠️ Troubleshooting
 
-### No Timecard Data
-**Symptom:** 0 timecards loaded, "Supervisor does not exist" errors  
-**Cause:** ADP configuration - workers need supervisor assignments  
-**Solution:** Assign supervisors in ADP Workforce Now interface
+### ✅ Timecard Issue Resolved!
+**Previous Issue:** "Supervisor does not exist" errors  
+**Solution Applied:** Changed endpoint from `/team-time-cards` to `/time-cards` with `roleCode: employee`  
+**Status:** Working perfectly - no supervisor assignment needed!
 
 ### Connection Errors
 **Symptom:** "getaddrinfo ENOTFOUND" error  

@@ -218,15 +218,17 @@ async function fetchAllWorkers() {
 
 async function fetchWorkerTimecards(aoid, workerName, monthsBack = 3) {
   try {
-    const endpoint = `/time/v2/workers/${aoid}/team-time-cards`;
+    // Use /time-cards endpoint with expanded day entries (no supervisor required!)
+    const endpoint = `/time/v2/workers/${aoid}/time-cards?$expand=dayentries`;
     console.log(`  📋 Fetching timecards for ${workerName}...`);
     
     const response = await makeADPRequest(endpoint, 'GET', null, { 'roleCode': 'employee' });
     
-    if (response.teamTimeCards && response.teamTimeCards.length > 0) {
+    // Note: Response uses 'timeCards' (not 'teamTimeCards')
+    if (response.timeCards && response.timeCards.length > 0) {
       // Filter for last N months
       const cutoffDate = DateTime.now().minus({ months: monthsBack });
-      const filteredCards = response.teamTimeCards.filter(card => {
+      const filteredCards = response.timeCards.filter(card => {
         const startDate = card.timePeriod?.startDate;
         if (!startDate) return false;
         const cardDate = DateTime.fromISO(startDate);
@@ -314,28 +316,29 @@ async function loadTimecardsToDatabase(workerTimecards, client) {
   for (const { aoid, name, timecards } of workerTimecards) {
     for (const timecard of timecards) {
       try {
-        const timePeriod = timecard.timePeriod || {};
-        const startDate = timePeriod.startDate;
-        const endDate = timePeriod.endDate;
-        const status = timecard.timeCardStatus?.statusCode?.codeValue || 'Unknown';
-        
-        // Extract time entries if available
+        // Extract day entries with time punches
         const dayEntries = timecard.dayEntries || [];
         
         for (const dayEntry of dayEntries) {
           const entryDate = dayEntry.entryDate;
           const timeEntries = dayEntry.timeEntries || [];
           
-          for (const timeEntry of timeEntries) {
-            const inTime = timeEntry.in?.dateTime;
-            const outTime = timeEntry.out?.dateTime;
+          // Process each time entry (punch in/out pair)
+          for (let idx = 0; idx < timeEntries.length; idx++) {
+            const timeEntry = timeEntries[idx];
             
+            // Get start and end times
+            const inTime = timeEntry.startPeriod?.startDateTime;
+            const outTime = timeEntry.endPeriod?.endDateTime;
+            
+            // Only insert if we have both clock in and clock out times
             if (inTime && outTime) {
               const clockIn = DateTime.fromISO(inTime).toJSDate();
               const clockOut = DateTime.fromISO(outTime).toJSDate();
               const hoursWorked = (clockOut - clockIn) / (1000 * 60 * 60);
               
-              const timecardId = `${aoid}-${entryDate}-${timeEntry.sequenceNumber || inserted}`;
+              // Create unique ID for this timecard entry
+              const timecardId = `${aoid}-${entryDate}-${idx}`;
               
               const result = await client.query(
                 `INSERT INTO timecards (
@@ -369,7 +372,7 @@ async function loadTimecardsToDatabase(workerTimecards, client) {
           }
         }
       } catch (err) {
-        console.error(`  ❌ Error loading timecard: ${err.message}`);
+        console.error(`  ❌ Error loading timecard for ${name}: ${err.message}`);
         skipped++;
       }
     }

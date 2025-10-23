@@ -309,28 +309,40 @@ export async function searchTimeCards(query, options = {}) {
     for (const worker of activeWorkers) {
       try {
         const aoid = worker.associateOID;
-        const endpoint = `/time/v2/workers/${aoid}/team-time-cards`;
+        // Use /time-cards endpoint (no supervisor required!) with expanded day entries
+        const endpoint = `/time/v2/workers/${aoid}/time-cards?$expand=dayentries`;
         
         const timecardsResponse = await makeADPRequest(endpoint, 'GET', null, { 'roleCode': 'employee' });
         
-        if (timecardsResponse.teamTimeCards && timecardsResponse.teamTimeCards.length > 0) {
-          console.log(`[ADP Timecards] Found ${timecardsResponse.teamTimeCards.length} timecards for ${worker.person?.legalName?.formattedName}`);
+        if (timecardsResponse.timeCards && timecardsResponse.timeCards.length > 0) {
+          console.log(`[ADP Timecards] Found ${timecardsResponse.timeCards.length} timecards for ${worker.person?.legalName?.formattedName}`);
           
-          timecardsResponse.teamTimeCards.forEach(timecard => {
+          timecardsResponse.timeCards.forEach(timecard => {
+            // Calculate total hours from dailyTotals if available
+            let totalHours = 'N/A';
+            if (timecard.totalPeriodTimeDuration) {
+              // Parse ISO 8601 duration (e.g., "PT18H56M" = 18 hours 56 minutes)
+              const match = timecard.totalPeriodTimeDuration.match(/PT(\d+)H(\d+)M/);
+              if (match) {
+                totalHours = `${match[1]}h ${match[2]}m`;
+              }
+            }
+            
             results.push({
               type: 'timecard',
               title: `Timecard for ${worker.person?.legalName?.formattedName || 'Unknown'}`,
               employeeId: aoid,
               employeeName: worker.person?.legalName?.formattedName,
               period: `${timecard.timePeriod?.startDate || 'N/A'} to ${timecard.timePeriod?.endDate || 'N/A'}`,
-              status: timecard.timeCardStatus?.statusCode?.codeValue || 'Unknown',
-              snippet: `Timecard period: ${timecard.timePeriod?.startDate || 'N/A'} to ${timecard.timePeriod?.endDate || 'N/A'} - Status: ${timecard.timeCardStatus?.statusCode?.codeValue || 'Unknown'}`,
+              status: timecard.processingStatusCode?.codeValue || 'Unknown',
+              totalHours: totalHours,
+              snippet: `Timecard period: ${timecard.timePeriod?.startDate || 'N/A'} to ${timecard.timePeriod?.endDate || 'N/A'} - Total: ${totalHours} - Status: ${timecard.processingStatusCode?.codeValue || 'Unknown'}`,
             });
           });
         }
       } catch (err) {
-        // Skip workers that fail (e.g., missing supervisor)
-        console.log(`[ADP Timecards] Skipping worker ${worker.associateOID}: ${err.message}`);
+        // Log errors but continue with other workers
+        console.log(`[ADP Timecards] Error for worker ${worker.associateOID}: ${err.message}`);
       }
     }
     
