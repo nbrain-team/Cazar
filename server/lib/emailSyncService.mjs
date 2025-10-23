@@ -140,7 +140,7 @@ export async function processAndStoreEmail(email, dbPool = pool) {
  * Link responses to their original requests
  * @param {Object} dbPool - Database connection pool
  */
-export async function linkResponsesTo Requests(dbPool = pool) {
+export async function linkResponsesToRequests(dbPool = pool) {
   try {
     // Find emails in the same conversation
     const linkQuery = `
