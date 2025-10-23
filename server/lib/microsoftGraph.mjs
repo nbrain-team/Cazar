@@ -72,6 +72,7 @@ async function getGraphClient() {
 // Search emails
 export async function searchEmails(query, maxResults = 5) {
   try {
+    console.log(`[Microsoft] Searching emails for: "${query}"`);
     const client = await getGraphClient();
     
     // Search across all users (requires admin consent)
@@ -81,11 +82,13 @@ export async function searchEmails(query, maxResults = 5) {
       .get();
     
     const users = response.value || [];
+    console.log(`[Microsoft] Found ${users.length} users to search`);
     const allResults = [];
     
     // Search each user's mailbox
     for (const user of users.slice(0, 3)) { // Limit to first 3 users for performance
       try {
+        console.log(`[Microsoft] Searching mailbox for user: ${user.displayName}`);
         const messages = await client
           .api(`/users/${user.id}/messages`)
           .filter(`contains(subject,'${query}') or contains(bodyPreview,'${query}')`)
@@ -95,6 +98,7 @@ export async function searchEmails(query, maxResults = 5) {
           .get();
         
         if (messages.value) {
+          console.log(`[Microsoft] Found ${messages.value.length} emails for ${user.displayName}`);
           allResults.push(...messages.value.map(msg => ({
             type: 'email',
             title: msg.subject,
@@ -105,14 +109,21 @@ export async function searchEmails(query, maxResults = 5) {
           })));
         }
       } catch (err) {
-        console.error(`Error searching user ${user.displayName}:`, err.message);
+        console.error(`[Microsoft] Error searching user ${user.displayName}:`, err.message);
+        if (err.statusCode === 403) {
+          console.error(`[Microsoft] Permission denied for ${user.displayName} - likely missing Mail.Read permission or admin consent`);
+        }
       }
     }
     
+    console.log(`[Microsoft] Email search complete - found ${allResults.length} total emails`);
     return allResults.slice(0, maxResults);
   } catch (error) {
-    console.error('Email search error:', error);
-    return [];
+    console.error('[Microsoft] Email search error:', error.message);
+    if (error.statusCode === 403) {
+      throw new Error('Forbidden - Admin consent required for Mail.Read permission');
+    }
+    throw error;
   }
 }
 
