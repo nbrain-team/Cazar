@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Activity,
   Bot,
-  Shield
+  Shield,
+  MessagesSquare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ expanded, onToggle }) => {
     { path: '/hos-607', icon: ShieldCheck, label: 'Compliance & HOS 60/7' },
     { path: '/reports', icon: FileText, label: 'Reports' },
     { path: '/smart-agent', icon: Bot, label: 'Smart Agent' },
+    { path: '/microsoft-agent', icon: MessagesSquare, label: 'Microsoft Agent' },
     { path: '/admin', icon: Shield, label: 'Admin Panel' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];

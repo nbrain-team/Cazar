@@ -2247,6 +2247,7 @@ import { searchMicrosoft365 } from './lib/microsoftGraph.mjs';
 import { searchADP as searchADPService } from './lib/adpService.mjs';
 import { processMeetingTranscript, searchMeetings } from './lib/readAIService.mjs';
 import { runSophisticatedAgent, formatAgentResponse } from './lib/sophisticatedAgent.mjs';
+import * as teamsService from './lib/teamsService.mjs';
 
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
@@ -2841,6 +2842,113 @@ app.delete('/api/admin/users/:userId', async (req, res) => {
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: 'failed_to_delete_user' });
+  }
+});
+
+// ===== MICROSOFT TEAMS AGENT API ROUTES =====
+
+// GET /api/microsoft/teams - List all teams
+app.get('/api/microsoft/teams', async (req, res) => {
+  try {
+    const teams = await teamsService.listTeams();
+    res.json({ teams });
+  } catch (error) {
+    console.error('Error listing teams:', error);
+    res.status(500).json({ error: 'failed_to_list_teams', message: error.message });
+  }
+});
+
+// GET /api/microsoft/teams/:teamId/channels - List channels in a team
+app.get('/api/microsoft/teams/:teamId/channels', async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const channels = await teamsService.listChannels(teamId);
+    res.json({ channels });
+  } catch (error) {
+    console.error('Error listing channels:', error);
+    res.status(500).json({ error: 'failed_to_list_channels', message: error.message });
+  }
+});
+
+// GET /api/microsoft/teams/:teamId/members - List team members
+app.get('/api/microsoft/teams/:teamId/members', async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const members = await teamsService.listTeamMembers(teamId);
+    res.json({ members });
+  } catch (error) {
+    console.error('Error listing team members:', error);
+    res.status(500).json({ error: 'failed_to_list_members', message: error.message });
+  }
+});
+
+// GET /api/microsoft/teams/:teamId/channels/:channelId/messages - List channel messages
+app.get('/api/microsoft/teams/:teamId/channels/:channelId/messages', async (req, res) => {
+  try {
+    const { teamId, channelId } = req.params;
+    const { limit } = req.query;
+    const messages = await teamsService.listChannelMessages(teamId, channelId, limit ? parseInt(limit) : 50);
+    res.json({ messages });
+  } catch (error) {
+    console.error('Error listing channel messages:', error);
+    res.status(500).json({ error: 'failed_to_list_messages', message: error.message });
+  }
+});
+
+// GET /api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies - Get message replies
+app.get('/api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies', async (req, res) => {
+  try {
+    const { teamId, channelId, messageId } = req.params;
+    const replies = await teamsService.getMessageReplies(teamId, channelId, messageId);
+    res.json({ replies });
+  } catch (error) {
+    console.error('Error getting message replies:', error);
+    res.status(500).json({ error: 'failed_to_get_replies', message: error.message });
+  }
+});
+
+// POST /api/microsoft/teams/:teamId/channels/:channelId/messages - Create new message/thread
+app.post('/api/microsoft/teams/:teamId/channels/:channelId/messages', async (req, res) => {
+  try {
+    const { teamId, channelId } = req.params;
+    const { subject, content, mentionMember } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'content_required' });
+    }
+    
+    const message = await teamsService.createChannelMessage(teamId, channelId, {
+      subject,
+      content,
+      mentionMember
+    });
+    
+    res.json({ message });
+  } catch (error) {
+    console.error('Error creating channel message:', error);
+    res.status(500).json({ error: 'failed_to_create_message', message: error.message });
+  }
+});
+
+// POST /api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies - Reply to message
+app.post('/api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies', async (req, res) => {
+  try {
+    const { teamId, channelId, messageId } = req.params;
+    const { content, mentionMember } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'content_required' });
+    }
+    
+    const reply = await teamsService.replyToMessage(teamId, channelId, messageId, {
+      content,
+      mentionMember
+    });
+    
+    res.json({ reply });
+  } catch (error) {
+    console.error('Error replying to message:', error);
+    res.status(500).json({ error: 'failed_to_reply', message: error.message });
   }
 });
 
