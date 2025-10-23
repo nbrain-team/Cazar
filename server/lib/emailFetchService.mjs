@@ -231,27 +231,44 @@ export async function fetchEmailsByDateRange(startDate, endDate, options = {}) {
       maxPerMailbox = 500
     } = options;
 
-    const users = await getMailboxUsers();
+    // Use accessible mailboxes only
+    const targetMailboxes = [
+      { email: 'jad@cazarnyc.com', name: 'Jad' },
+      { email: 'vinny@cazarnyc.com', name: 'Vinny' },
+      { email: 'Abdul@CazarNYC.com', name: 'Abdul' },
+      { email: 'allan@CazarNYC.com', name: 'Allan Peralta' },
+      { email: 'Allison@CazarNYC.com', name: 'Allison Jalmanzar' }
+    ];
+    
     const allEmails = [];
     
     const startISO = new Date(startDate).toISOString();
     const endISO = new Date(endDate).toISOString();
     
-    for (const user of users) {
-      const emails = await fetchUserEmails(user.id, {
-        top: maxPerMailbox,
-        filter: `receivedDateTime ge ${startISO} and receivedDateTime le ${endISO}`,
-        orderby: 'receivedDateTime DESC'
-      });
-      
-      emails.forEach(email => {
-        email.mailboxOwner = user.displayName;
-        email.mailboxEmail = user.mail || user.userPrincipalName;
-      });
-      
-      allEmails.push(...emails);
+    console.log(`[Email Fetch] Fetching from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`);
+    
+    for (const mailbox of targetMailboxes) {
+      try {
+        const emails = await fetchUserEmails(mailbox.email, {
+          top: maxPerMailbox,
+          filter: `receivedDateTime ge ${startISO} and receivedDateTime le ${endISO}`,
+          orderby: 'receivedDateTime DESC'
+        });
+        
+        console.log(`[Email Fetch]   ${mailbox.name}: ${emails.length} emails`);
+        
+        emails.forEach(email => {
+          email.mailboxOwner = mailbox.name;
+          email.mailboxEmail = mailbox.email;
+        });
+        
+        allEmails.push(...emails);
+      } catch (error) {
+        console.error(`[Email Fetch]   ${mailbox.email}: ${error.message}`);
+      }
     }
     
+    console.log(`[Email Fetch] Total for date range: ${allEmails.length} emails`);
     return allEmails;
     
   } catch (error) {

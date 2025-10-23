@@ -221,30 +221,26 @@ export async function syncEmails(options = {}) {
   };
   
   try {
+    // Import fetchEmailsByDateRange to use date-specific queries
+    const { fetchEmailsByDateRange } = await import('./emailFetchService.mjs');
+    
     // Process one day at a time
     for (let day = 0; day < daysBack; day++) {
       const dayStart = day * 24;
       const dayEnd = (day + 1) * 24;
-      const dayDate = new Date(Date.now() - dayStart * 60 * 60 * 1000);
+      
+      // Calculate exact day boundaries
+      const endDate = new Date(Date.now() - dayStart * 60 * 60 * 1000);
+      const startDate = new Date(Date.now() - dayEnd * 60 * 60 * 1000);
       
       console.log(`\n[Email Sync] ========================================`);
-      console.log(`[Email Sync] Day ${day + 1}/${daysBack}: ${dayDate.toLocaleDateString()}`);
+      console.log(`[Email Sync] Day ${day + 1}/${daysBack}: ${endDate.toLocaleDateString()}`);
       console.log(`[Email Sync] ========================================`);
       
       try {
-        // Fetch emails for this day only
-        const emails = await fetchAllRecentEmails({ 
-          hoursBack: dayEnd, 
-          maxPerMailbox: maxPerMailbox 
-        });
-        
-        // Filter to only this day's emails
-        const dayStartTime = Date.now() - dayEnd * 60 * 60 * 1000;
-        const dayEndTime = Date.now() - dayStart * 60 * 60 * 1000;
-        
-        const dayEmails = emails.filter(email => {
-          const emailTime = new Date(email.receivedDateTime).getTime();
-          return emailTime >= dayStartTime && emailTime < dayEndTime;
+        // Fetch emails for THIS SPECIFIC DAY only using date range
+        const dayEmails = await fetchEmailsByDateRange(startDate, endDate, {
+          maxPerMailbox: maxPerMailbox
         });
         
         console.log(`[Email Sync] Found ${dayEmails.length} emails for this day`);

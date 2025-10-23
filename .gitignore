@@ -37,3 +37,4 @@ build/
 # Payroll data files
 payrolldata/
 mcp-teams-server-master/
+test_ms*.mjs
