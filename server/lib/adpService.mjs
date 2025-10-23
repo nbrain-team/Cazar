@@ -236,25 +236,52 @@ async function makeADPRequest(endpoint, method = 'GET', body = null, additionalH
   }
 }
 
+// Helper function to fetch all workers with pagination
+async function fetchAllWorkersPaginated() {
+  const allWorkers = [];
+  let skip = 0;
+  const pageSize = 100;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const endpoint = `/hr/v2/workers?$skip=${skip}&$top=${pageSize}`;
+    const response = await makeADPRequest(endpoint);
+    
+    if (!response.workers || !Array.isArray(response.workers)) {
+      break;
+    }
+    
+    allWorkers.push(...response.workers);
+    
+    if (response.workers.length < pageSize) {
+      hasMore = false;
+    } else {
+      skip += pageSize;
+    }
+  }
+  
+  return allWorkers;
+}
+
 // Get all workers
 export async function searchEmployees(query = '') {
   try {
     console.log(`[ADP Employees] Searching for: "${query}"`);
     
-    const response = await makeADPRequest('/hr/v2/workers');
+    // Fetch all workers with pagination
+    const allWorkers = await fetchAllWorkersPaginated();
+    console.log(`[ADP Employees] Found ${allWorkers.length} total workers`);
     
     const results = [];
     
-    if (response.workers && Array.isArray(response.workers)) {
-      console.log(`[ADP Employees] Found ${response.workers.length} total workers`);
-      
+    if (allWorkers.length > 0) {
       // Filter by query if provided
-      const filtered = query ? response.workers.filter(worker => {
+      const filtered = query ? allWorkers.filter(worker => {
         const name = worker.person?.legalName?.formattedName || '';
         const id = worker.associateOID || '';
         return name.toLowerCase().includes(query.toLowerCase()) || 
                id.toLowerCase().includes(query.toLowerCase());
-      }) : response.workers;
+      }) : allWorkers;
       
       console.log(`[ADP Employees] ${filtered.length} workers match query`);
       
@@ -289,20 +316,20 @@ export async function searchTimeCards(query, options = {}) {
   try {
     console.log(`[ADP Timecards] Searching timecards for query: "${query}"`);
     
-    // First, get workers to find AOIDs
-    const workersResponse = await makeADPRequest('/hr/v2/workers');
+    // First, get workers to find AOIDs (with pagination)
+    const allWorkers = await fetchAllWorkersPaginated();
     
-    if (!workersResponse.workers || workersResponse.workers.length === 0) {
+    if (!allWorkers || allWorkers.length === 0) {
       console.log('[ADP Timecards] No workers found');
       return [];
     }
     
-    console.log(`[ADP Timecards] Found ${workersResponse.workers.length} workers, checking timecards...`);
+    console.log(`[ADP Timecards] Found ${allWorkers.length} workers, checking timecards...`);
     
     const results = [];
     
     // Get timecards for first few active workers
-    const activeWorkers = workersResponse.workers
+    const activeWorkers = allWorkers
       .filter(w => w.workerStatus?.statusCode?.codeValue === 'Active')
       .slice(0, 5);
     
@@ -385,20 +412,20 @@ export async function searchADP(query, options = {}) {
           lowerQuery.includes('current') || lowerQuery.includes('active')) {
         console.log('[ADP] Fetching complete employee list...');
         
-        // Get ALL employees (not limited to 10)
-        const response = await makeADPRequest('/hr/v2/workers');
+        // Get ALL employees with pagination
+        const allWorkers = await fetchAllWorkersPaginated();
         
-        if (!response.workers || !Array.isArray(response.workers)) {
+        if (!allWorkers || allWorkers.length === 0) {
           console.log('[ADP] No workers in response');
           return [];
         }
         
-        console.log(`[ADP] Found ${response.workers.length} total workers from API`);
+        console.log(`[ADP] Found ${allWorkers.length} total workers from API`);
         
         // Filter for active employees if query specifies "current" or "active"
-        let filteredWorkers = response.workers;
+        let filteredWorkers = allWorkers;
         if (lowerQuery.includes('current') || lowerQuery.includes('active')) {
-          filteredWorkers = response.workers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Active');
+          filteredWorkers = allWorkers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Active');
           console.log(`[ADP] Filtered to ${filteredWorkers.length} active employees`);
         }
         
@@ -489,9 +516,10 @@ export async function getADPSummary() {
   try {
     console.log('[ADP Summary] Fetching summary data...');
     
-    const response = await makeADPRequest('/hr/v2/workers');
+    // Get all workers with pagination
+    const workers = await fetchAllWorkersPaginated();
     
-    if (!response.workers) {
+    if (!workers || workers.length === 0) {
       return {
         totalWorkers: 0,
         activeWorkers: 0,
@@ -499,7 +527,6 @@ export async function getADPSummary() {
       };
     }
     
-    const workers = response.workers;
     const activeWorkers = workers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Active');
     const terminatedWorkers = workers.filter(w => w.workerStatus?.statusCode?.codeValue === 'Terminated');
     

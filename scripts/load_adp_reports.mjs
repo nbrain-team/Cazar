@@ -204,16 +204,38 @@ async function makeADPRequest(endpoint, method = 'GET', body = null, additionalH
 // ============================================================================
 
 async function fetchAllWorkers() {
-  console.log('\n📋 Fetching all workers from ADP...');
-  const response = await makeADPRequest('/hr/v2/workers');
+  console.log('\n📋 Fetching all workers from ADP (with pagination)...');
   
-  if (!response.workers || !Array.isArray(response.workers)) {
-    console.log('⚠️  No workers in response');
-    return [];
+  const allWorkers = [];
+  let skip = 0;
+  const pageSize = 100; // ADP max page size
+  let hasMore = true;
+  
+  while (hasMore) {
+    console.log(`  📄 Fetching page ${Math.floor(skip / pageSize) + 1} (skip=${skip}, top=${pageSize})...`);
+    
+    const endpoint = `/hr/v2/workers?$skip=${skip}&$top=${pageSize}`;
+    const response = await makeADPRequest(endpoint);
+    
+    if (!response.workers || !Array.isArray(response.workers)) {
+      console.log('  ⚠️  No workers in response, stopping pagination');
+      break;
+    }
+    
+    const workersInPage = response.workers.length;
+    allWorkers.push(...response.workers);
+    console.log(`  ✅ Got ${workersInPage} workers (total so far: ${allWorkers.length})`);
+    
+    // If we got fewer workers than requested, we've reached the end
+    if (workersInPage < pageSize) {
+      hasMore = false;
+    } else {
+      skip += pageSize;
+    }
   }
   
-  console.log(`✅ Found ${response.workers.length} workers`);
-  return response.workers;
+  console.log(`\n✅ Total workers fetched: ${allWorkers.length}`);
+  return allWorkers;
 }
 
 async function fetchWorkerTimecards(aoid, workerName, monthsBack = 3) {
