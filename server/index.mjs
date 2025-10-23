@@ -2247,7 +2247,10 @@ import { searchMicrosoft365 } from './lib/microsoftGraph.mjs';
 import { searchADP as searchADPService } from './lib/adpService.mjs';
 import { processMeetingTranscript, searchMeetings } from './lib/readAIService.mjs';
 import { runSophisticatedAgent, formatAgentResponse } from './lib/sophisticatedAgent.mjs';
-import * as teamsService from './lib/teamsService.mjs';
+
+// Import Claude 4.5 Email Analytics services
+import { generateEmailQuery, formatEmailQueryResults, isEmailQuery } from './lib/claudeEmailService.mjs';
+import { syncEmails, initializeEmailAnalytics, getSyncStats } from './lib/emailSyncService.mjs';
 
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
@@ -2260,9 +2263,52 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     
     console.log(`Smart Agent query: "${message}" with databases: [${enabledDatabases.join(', ')}]`);
     
+    // Check if this is an email-related query
+    const isEmailRelated = isEmailQuery(message);
+    
     // Collect context from enabled sources
     const contextSources = [];
     const sources = [];
+    
+    // Handle email analytics queries with Claude 4.5
+    if (isEmailRelated && (enabledDatabases.includes('email') || enabledDatabases.includes('microsoft'))) {
+      try {
+        console.log('[Smart Agent] Email query detected - using Claude 4.5 Email Analytics');
+        
+        // Generate and execute SQL query using Claude
+        const { sql, params, explanation } = await generateEmailQuery(message);
+        console.log(`[Smart Agent] Generated SQL: ${sql}`);
+        
+        const emailResults = await pool.query(sql, params || []);
+        
+        // Format results using Claude
+        const formattedResponse = await formatEmailQueryResults(emailResults.rows, message);
+        
+        // Add to context
+        contextSources.push(`[Email Analytics] ${formattedResponse}`);
+        sources.push({
+          type: 'email',
+          title: 'Email Analytics Results',
+          snippet: `${emailResults.rows.length} results found`,
+          data: emailResults.rows,
+          explanation
+        });
+        
+        console.log(`[Smart Agent] Email Analytics: ${emailResults.rows.length} results`);
+        
+        // For pure email queries, return immediately with Claude's response
+        if (!enabledDatabases.some(db => ['pinecone', 'web', 'postgres'].includes(db))) {
+          return res.json({
+            response: formattedResponse,
+            sources: sources,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (error) {
+        console.error('[Smart Agent] Email Analytics error:', error.message);
+        contextSources.push(`[Email Analytics] Error: ${error.message}`);
+      }
+    }
     
     // Search Pinecone if enabled
     if (enabledDatabases.includes('pinecone')) {
@@ -2845,110 +2891,150 @@ app.delete('/api/admin/users/:userId', async (req, res) => {
   }
 });
 
-// ===== MICROSOFT TEAMS AGENT API ROUTES =====
+// ===== EMAIL ANALYTICS API ENDPOINTS (Claude 4.5 Powered) =====
 
-// GET /api/microsoft/teams - List all teams
-app.get('/api/microsoft/teams', async (req, res) => {
+// POST /api/email-analytics/sync - Manually trigger email sync
+app.post('/api/email-analytics/sync', async (req, res) => {
   try {
-    const teams = await teamsService.listTeams();
-    res.json({ teams });
-  } catch (error) {
-    console.error('Error listing teams:', error);
-    res.status(500).json({ error: 'failed_to_list_teams', message: error.message });
-  }
-});
-
-// GET /api/microsoft/teams/:teamId/channels - List channels in a team
-app.get('/api/microsoft/teams/:teamId/channels', async (req, res) => {
-  try {
-    const { teamId } = req.params;
-    const channels = await teamsService.listChannels(teamId);
-    res.json({ channels });
-  } catch (error) {
-    console.error('Error listing channels:', error);
-    res.status(500).json({ error: 'failed_to_list_channels', message: error.message });
-  }
-});
-
-// GET /api/microsoft/teams/:teamId/members - List team members
-app.get('/api/microsoft/teams/:teamId/members', async (req, res) => {
-  try {
-    const { teamId } = req.params;
-    const members = await teamsService.listTeamMembers(teamId);
-    res.json({ members });
-  } catch (error) {
-    console.error('Error listing team members:', error);
-    res.status(500).json({ error: 'failed_to_list_members', message: error.message });
-  }
-});
-
-// GET /api/microsoft/teams/:teamId/channels/:channelId/messages - List channel messages
-app.get('/api/microsoft/teams/:teamId/channels/:channelId/messages', async (req, res) => {
-  try {
-    const { teamId, channelId } = req.params;
-    const { limit } = req.query;
-    const messages = await teamsService.listChannelMessages(teamId, channelId, limit ? parseInt(limit) : 50);
-    res.json({ messages });
-  } catch (error) {
-    console.error('Error listing channel messages:', error);
-    res.status(500).json({ error: 'failed_to_list_messages', message: error.message });
-  }
-});
-
-// GET /api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies - Get message replies
-app.get('/api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies', async (req, res) => {
-  try {
-    const { teamId, channelId, messageId } = req.params;
-    const replies = await teamsService.getMessageReplies(teamId, channelId, messageId);
-    res.json({ replies });
-  } catch (error) {
-    console.error('Error getting message replies:', error);
-    res.status(500).json({ error: 'failed_to_get_replies', message: error.message });
-  }
-});
-
-// POST /api/microsoft/teams/:teamId/channels/:channelId/messages - Create new message/thread
-app.post('/api/microsoft/teams/:teamId/channels/:channelId/messages', async (req, res) => {
-  try {
-    const { teamId, channelId } = req.params;
-    const { subject, content, mentionMember } = req.body;
+    const { hoursBack = 720, maxPerMailbox = 500 } = req.body; // 30 days default
     
-    if (!content) {
-      return res.status(400).json({ error: 'content_required' });
+    console.log(`[API] Starting email sync: ${hoursBack} hours back`);
+    
+    const result = await syncEmails({ hoursBack, maxPerMailbox });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('[API] Email sync error:', error);
+    res.status(500).json({ error: 'email_sync_failed', message: error.message });
+  }
+});
+
+// GET /api/email-analytics/stats - Get email analytics statistics
+app.get('/api/email-analytics/stats', async (req, res) => {
+  try {
+    const stats = await getSyncStats();
+    res.json({ stats });
+  } catch (error) {
+    console.error('[API] Stats error:', error);
+    res.status(500).json({ error: 'stats_failed', message: error.message });
+  }
+});
+
+// POST /api/email-analytics/query - Query email analytics with natural language
+app.post('/api/email-analytics/query', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'query_required' });
     }
     
-    const message = await teamsService.createChannelMessage(teamId, channelId, {
-      subject,
-      content,
-      mentionMember
+    console.log(`[API] Email query: "${query}"`);
+    
+    // Generate SQL query using Claude
+    const { sql, params, explanation, result_type } = await generateEmailQuery(query);
+    
+    console.log(`[API] Generated SQL: ${sql}`);
+    
+    // Execute query
+    const result = await pool.query(sql, params || []);
+    
+    // Format results using Claude
+    const formattedResponse = await formatEmailQueryResults(result.rows, query);
+    
+    res.json({
+      response: formattedResponse,
+      data: result.rows,
+      result_type,
+      explanation,
+      query_executed: sql
     });
     
-    res.json({ message });
   } catch (error) {
-    console.error('Error creating channel message:', error);
-    res.status(500).json({ error: 'failed_to_create_message', message: error.message });
+    console.error('[API] Email query error:', error);
+    res.status(500).json({ error: 'query_failed', message: error.message });
   }
 });
 
-// POST /api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies - Reply to message
-app.post('/api/microsoft/teams/:teamId/channels/:channelId/messages/:messageId/replies', async (req, res) => {
+// GET /api/email-analytics/unanswered - Get unanswered requests
+app.get('/api/email-analytics/unanswered', async (req, res) => {
   try {
-    const { teamId, channelId, messageId } = req.params;
-    const { content, mentionMember } = req.body;
+    const { hours = 48 } = req.query;
     
-    if (!content) {
-      return res.status(400).json({ error: 'content_required' });
-    }
+    const result = await pool.query(`
+      SELECT * FROM unanswered_requests
+      WHERE hours_waiting >= $1
+      ORDER BY hours_waiting DESC
+      LIMIT 100
+    `, [hours]);
     
-    const reply = await teamsService.replyToMessage(teamId, channelId, messageId, {
-      content,
-      mentionMember
-    });
-    
-    res.json({ reply });
+    res.json({ requests: result.rows });
   } catch (error) {
-    console.error('Error replying to message:', error);
-    res.status(500).json({ error: 'failed_to_reply', message: error.message });
+    console.error('[API] Unanswered requests error:', error);
+    res.status(500).json({ error: 'query_failed', message: error.message });
+  }
+});
+
+// GET /api/email-analytics/driver-requests - Get driver requests summary
+app.get('/api/email-analytics/driver-requests', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM driver_requests_summary ORDER BY last_request_date DESC LIMIT 100');
+    res.json({ driver_requests: result.rows });
+  } catch (error) {
+    console.error('[API] Driver requests error:', error);
+    res.status(500).json({ error: 'query_failed', message: error.message });
+  }
+});
+
+// GET /api/email-analytics/response-metrics - Get response time metrics
+app.get('/api/email-analytics/response-metrics', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    const result = await pool.query(`
+      SELECT * FROM response_metrics
+      WHERE day >= CURRENT_DATE - $1
+      ORDER BY day DESC, responded_by
+    `, [days]);
+    
+    res.json({ metrics: result.rows });
+  } catch (error) {
+    console.error('[API] Response metrics error:', error);
+    res.status(500).json({ error: 'query_failed', message: error.message });
+  }
+});
+
+// GET /api/email-analytics/category-volume - Get email volume by category
+app.get('/api/email-analytics/category-volume', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    
+    const result = await pool.query(`
+      SELECT * FROM email_volume_by_category
+      WHERE day >= CURRENT_DATE - $1
+      ORDER BY day DESC, category
+    `, [days]);
+    
+    res.json({ volume: result.rows });
+  } catch (error) {
+    console.error('[API] Category volume error:', error);
+    res.status(500).json({ error: 'query_failed', message: error.message });
+  }
+});
+
+// POST /api/email-analytics/initialize - Initialize email analytics database
+app.post('/api/email-analytics/initialize', async (req, res) => {
+  try {
+    const success = await initializeEmailAnalytics();
+    
+    if (success) {
+      res.json({ success: true, message: 'Email analytics database initialized' });
+    } else {
+      res.status(500).json({ success: false, message: 'Failed to initialize database' });
+    }
+  } catch (error) {
+    console.error('[API] Initialize error:', error);
+    res.status(500).json({ error: 'init_failed', message: error.message });
   }
 });
 
