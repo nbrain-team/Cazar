@@ -2893,13 +2893,62 @@ app.delete('/api/admin/users/:userId', async (req, res) => {
 
 // ===== EMAIL ANALYTICS API ENDPOINTS (Claude 4.5 Powered) =====
 
+// Global sync status tracker
+let currentSyncStatus = {
+  inProgress: false,
+  startTime: null,
+  currentDay: 0,
+  totalDays: 0,
+  processed: 0,
+  lastUpdate: null
+};
+
 // POST /api/email-analytics/sync - Manually trigger email sync
 app.post('/api/email-analytics/sync', async (req, res) => {
   try {
-    const { hoursBack = 720, maxPerMailbox = 500 } = req.body; // 30 days default
+    const { hoursBack = 720, maxPerMailbox = 500, background = false } = req.body; // 30 days default
+    
+    // Check if sync already in progress
+    if (currentSyncStatus.inProgress) {
+      return res.json({
+        message: 'Sync already in progress',
+        status: currentSyncStatus
+      });
+    }
     
     console.log(`[API] Starting email sync: ${hoursBack} hours back`);
     
+    // If background mode, start sync and return immediately
+    if (background) {
+      currentSyncStatus = {
+        inProgress: true,
+        startTime: new Date().toISOString(),
+        currentDay: 0,
+        totalDays: Math.ceil(hoursBack / 24),
+        processed: 0,
+        lastUpdate: new Date().toISOString()
+      };
+      
+      // Run sync in background
+      syncEmails({ hoursBack, maxPerMailbox }).then(result => {
+        currentSyncStatus.inProgress = false;
+        currentSyncStatus.completed = true;
+        currentSyncStatus.result = result;
+        currentSyncStatus.lastUpdate = new Date().toISOString();
+      }).catch(error => {
+        currentSyncStatus.inProgress = false;
+        currentSyncStatus.error = error.message;
+        currentSyncStatus.lastUpdate = new Date().toISOString();
+      });
+      
+      return res.json({
+        message: 'Sync started in background',
+        status: currentSyncStatus,
+        check_status_at: '/api/email-analytics/sync-status'
+      });
+    }
+    
+    // Normal sync - wait for completion
     const result = await syncEmails({ hoursBack, maxPerMailbox });
     
     res.json(result);
@@ -2907,6 +2956,11 @@ app.post('/api/email-analytics/sync', async (req, res) => {
     console.error('[API] Email sync error:', error);
     res.status(500).json({ error: 'email_sync_failed', message: error.message });
   }
+});
+
+// GET /api/email-analytics/sync-status - Check sync progress
+app.get('/api/email-analytics/sync-status', async (req, res) => {
+  res.json(currentSyncStatus);
 });
 
 // GET /api/email-analytics/stats - Get email analytics statistics
