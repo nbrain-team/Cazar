@@ -207,63 +207,136 @@ export async function syncEmails(options = {}) {
     processThreads = false
   } = options;
   
-  console.log(`[Email Sync] Starting email sync (${hoursBack} hours back)...`);
+  const daysBack = Math.ceil(hoursBack / 24);
+  
+  console.log(`[Email Sync] ========================================`);
+  console.log(`[Email Sync] Starting email sync for ${daysBack} days`);
+  console.log(`[Email Sync] ========================================`);
+  
+  const overallResults = {
+    processed: 0,
+    skipped: 0,
+    errors: 0,
+    dayResults: []
+  };
   
   try {
-    // Fetch emails from Microsoft Graph
-    const emails = await fetchAllRecentEmails({ hoursBack, maxPerMailbox });
-    
-    console.log(`[Email Sync] Fetched ${emails.length} emails from Microsoft Graph`);
-    
-    if (emails.length === 0) {
-      return {
-        success: true,
-        processed: 0,
-        skipped: 0,
-        errors: 0
-      };
-    }
-    
-    // Process each email
-    const results = {
-      processed: 0,
-      skipped: 0,
-      errors: 0,
-      details: []
-    };
-    
-    for (const email of emails) {
-      const result = await processAndStoreEmail(email);
+    // Process one day at a time
+    for (let day = 0; day < daysBack; day++) {
+      const dayStart = day * 24;
+      const dayEnd = (day + 1) * 24;
+      const dayDate = new Date(Date.now() - dayStart * 60 * 60 * 1000);
       
-      if (result.skipped) {
-        results.skipped++;
-      } else if (result.success) {
-        results.processed++;
-      } else {
-        results.errors++;
+      console.log(`\n[Email Sync] ========================================`);
+      console.log(`[Email Sync] Day ${day + 1}/${daysBack}: ${dayDate.toLocaleDateString()}`);
+      console.log(`[Email Sync] ========================================`);
+      
+      try {
+        // Fetch emails for this day only
+        const emails = await fetchAllRecentEmails({ 
+          hoursBack: dayEnd, 
+          maxPerMailbox: maxPerMailbox 
+        });
+        
+        // Filter to only this day's emails
+        const dayStartTime = Date.now() - dayEnd * 60 * 60 * 1000;
+        const dayEndTime = Date.now() - dayStart * 60 * 60 * 1000;
+        
+        const dayEmails = emails.filter(email => {
+          const emailTime = new Date(email.receivedDateTime).getTime();
+          return emailTime >= dayStartTime && emailTime < dayEndTime;
+        });
+        
+        console.log(`[Email Sync] Found ${dayEmails.length} emails for this day`);
+        
+        if (dayEmails.length === 0) {
+          console.log(`[Email Sync] No emails for this day - skipping`);
+          overallResults.dayResults.push({
+            day: day + 1,
+            date: dayDate.toLocaleDateString(),
+            processed: 0,
+            skipped: 0,
+            errors: 0
+          });
+          continue;
+        }
+        
+        // Process each email for this day
+        let dayProcessed = 0;
+        let daySkipped = 0;
+        let dayErrors = 0;
+        
+        for (const email of dayEmails) {
+          const result = await processAndStoreEmail(email);
+          
+          if (result.skipped) {
+            daySkipped++;
+          } else if (result.success) {
+            dayProcessed++;
+            // Log every 10 emails
+            if (dayProcessed % 10 === 0) {
+              console.log(`[Email Sync]   Processed ${dayProcessed}/${dayEmails.length} emails...`);
+            }
+          } else {
+            dayErrors++;
+          }
+          
+          // Small delay to avoid rate limiting Claude API
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Day summary
+        console.log(`[Email Sync] Day ${day + 1} complete: ✅ ${dayProcessed} processed, ⏭️  ${daySkipped} skipped, ❌ ${dayErrors} errors`);
+        
+        overallResults.processed += dayProcessed;
+        overallResults.skipped += daySkipped;
+        overallResults.errors += dayErrors;
+        overallResults.dayResults.push({
+          day: day + 1,
+          date: dayDate.toLocaleDateString(),
+          processed: dayProcessed,
+          skipped: daySkipped,
+          errors: dayErrors
+        });
+        
+      } catch (dayError) {
+        console.error(`[Email Sync] Error processing day ${day + 1}:`, dayError.message);
+        overallResults.dayResults.push({
+          day: day + 1,
+          date: dayDate.toLocaleDateString(),
+          processed: 0,
+          skipped: 0,
+          errors: 1,
+          error: dayError.message
+        });
       }
-      
-      results.details.push(result);
-      
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Link responses to requests
-    await linkResponsesToRequests();
+    // Link responses to requests after all days processed
+    console.log(`\n[Email Sync] ========================================`);
+    console.log(`[Email Sync] Linking responses to requests...`);
+    const linkedCount = await linkResponsesToRequests();
+    console.log(`[Email Sync] Linked ${linkedCount} responses to requests`);
     
-    console.log(`[Email Sync] Sync complete: ${results.processed} processed, ${results.skipped} skipped, ${results.errors} errors`);
+    // Final summary
+    console.log(`\n[Email Sync] ========================================`);
+    console.log(`[Email Sync] SYNC COMPLETE`);
+    console.log(`[Email Sync] ========================================`);
+    console.log(`[Email Sync] Total: ✅ ${overallResults.processed} processed, ⏭️  ${overallResults.skipped} skipped, ❌ ${overallResults.errors} errors`);
+    console.log(`[Email Sync] Days synced: ${daysBack}`);
+    console.log(`[Email Sync] ========================================\n`);
     
     return {
       success: true,
-      ...results
+      ...overallResults
     };
     
   } catch (error) {
     console.error('[Email Sync] Sync error:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      ...overallResults
     };
   }
 }
