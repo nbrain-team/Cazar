@@ -127,7 +127,17 @@ export async function processAndStoreEmail(email, dbPool = pool) {
     };
     
   } catch (error) {
-    console.error(`[Email Sync] Error processing email ${email.id}:`, error);
+    // Handle duplicate key errors gracefully (email already exists)
+    if (error.code === '23505' && error.constraint === 'email_analytics_message_id_key') {
+      // Email already exists - this is normal on re-runs
+      return {
+        skipped: true,
+        messageId: email.id,
+        reason: 'already_exists'
+      };
+    }
+    
+    console.error(`[Email Sync] Error processing email ${email.id}:`, error.message);
     return {
       success: false,
       error: error.message,
