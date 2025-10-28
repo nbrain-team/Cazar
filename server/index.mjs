@@ -2266,6 +2266,12 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     // Check if this is an email-related query (using AI detection)
     const isEmailRelated = await isEmailQuery(message);
     
+    // Auto-enable email search if AI detects it should be used
+    if (isEmailRelated && !enabledDatabases.includes('email') && !enabledDatabases.includes('microsoft')) {
+      console.log('[Smart Agent] Auto-enabling email search based on AI detection');
+      enabledDatabases.push('email');
+    }
+    
     // Collect context from enabled sources
     const contextSources = [];
     const sources = [];
