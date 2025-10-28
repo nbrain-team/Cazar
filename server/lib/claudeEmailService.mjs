@@ -349,12 +349,39 @@ Respond with ONLY "YES" or "NO" (one word).`;
     
   } catch (error) {
     console.error('[Email Detection] Error:', error.message);
-    // Fallback to keyword matching on error
+    // Fallback to comprehensive keyword matching on error
     const emailKeywords = [
-      'email', 'message', 'policy', 'insurance', 'liability', 'claim', 
-      'renewal', 'expiration', 'correspondence', 'communication'
+      // Direct email terms
+      'email', 'message', 'inbox', 'mailbox', 'sent', 'received', 'forwarded',
+      // Business communication
+      'policy', 'insurance', 'liability', 'claim', 'renewal', 'expiration', 'expiring',
+      'correspondence', 'communication', 'notification', 'alert', 'announcement',
+      // Requests and responses
+      'request', 'response', 'reply', 'pto', 'payroll', 'uniform', 'incident',
+      'pending', 'submitted', 'handled', 'assigned', 'escalated',
+      // Email-typical content
+      'broker', 'coverage', 'premium', 'attachment', 'thread', 'conversation',
+      // People asking/telling
+      'priorities', 'concerns', 'matters', 'issues', 'updates', 'status',
+      'what should', 'what needs', 'anything i need', 'what do i need',
+      'who said', 'who sent', 'who replied', 'what did', 'did anyone',
+      // Time-based queries that likely refer to emails
+      'yesterday', 'today', 'last week', 'this week', 'this month'
     ];
-    return emailKeywords.some(k => query.toLowerCase().includes(k));
+    
+    const lowerQuery = query.toLowerCase();
+    const matches = emailKeywords.some(k => lowerQuery.includes(k));
+    
+    // Also check for patterns like "what should [person] be thinking about"
+    const priorityPatterns = [
+      /what (should|needs?|must).*(priority|priorities|focus|attention|concern)/i,
+      /any.*(urgent|important|critical|priority|concern|matter)/i,
+      /(priorities|concerns|matters|issues) for (today|this week|rudy)/i
+    ];
+    
+    const matchesPattern = priorityPatterns.some(pattern => pattern.test(query));
+    
+    return matches || matchesPattern;
   }
 }
 
