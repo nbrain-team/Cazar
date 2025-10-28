@@ -257,7 +257,11 @@ export function isEmailQuery(query) {
     'uniform', 'fleet', 'incident', 'forwarded', 'pending',
     'turnaround', 'response time', 'attachment', 'driver request',
     'hours without response', 'average response', 'submitted',
-    'handled', 'assigned', 'category'
+    'handled', 'assigned', 'category', 'policy', 'insurance',
+    'liability', 'claim', 'renewal', 'expiration', 'expiring',
+    'broker', 'coverage', 'premium', 'correspondence', 'communication',
+    'sent yesterday', 'sent today', 'sent last week', 'received from',
+    'thread', 'conversation', 'inbox', 'mailbox'
   ];
   
   const lowerQuery = query.toLowerCase();
