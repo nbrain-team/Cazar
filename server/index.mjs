@@ -2118,6 +2118,8 @@ async function searchPostgres(query, pool) {
       const isRecentQuery = qLower.includes('recent') || qLower.includes('new') || qLower.includes('hire');
       const isBreakQuery = (qLower.includes('break') || qLower.includes('lunch') || qLower.includes('meal')) && 
                           (qLower.includes('6 hour') || qLower.includes('consecutive') || qLower.includes('without') || qLower.includes('exceed'));
+      const isTimecardQuery = qLower.includes('hour') || qLower.includes('timecard') || qLower.includes('worked') || 
+                             qLower.includes('clock') || qLower.includes('time logged');
       
       // Handle statistical queries
       if (isCountQuery && isEmployeeQuery) {
@@ -2230,6 +2232,41 @@ async function searchPostgres(query, pool) {
            ORDER BY dv.occurred_at DESC LIMIT 5`
         );
         results.violations = rows;
+      }
+      
+      // Search timecards if query mentions hours/timecards
+      if (isTimecardQuery) {
+        console.log('[DB] Detected timecard/hours query');
+        
+        // Determine date range from query
+        let dateFilter = '';
+        if (qLower.includes('last week')) {
+          dateFilter = "AND t.date >= CURRENT_DATE - INTERVAL '14 days' AND t.date < CURRENT_DATE - INTERVAL '7 days'";
+        } else if (qLower.includes('this week') || qLower.includes('current week')) {
+          dateFilter = "AND t.date >= CURRENT_DATE - INTERVAL '7 days'";
+        } else if (qLower.includes('today')) {
+          dateFilter = "AND t.date = CURRENT_DATE";
+        } else if (qLower.includes('yesterday')) {
+          dateFilter = "AND t.date = CURRENT_DATE - 1";
+        } else {
+          // Default: last 14 days
+          dateFilter = "AND t.date >= CURRENT_DATE - INTERVAL '14 days'";
+        }
+        
+        // Get timecard summary
+        const { rows: timecardSummary } = await client.query(`
+          SELECT 
+            COUNT(*) as entry_count,
+            COUNT(DISTINCT t.employee_id) as worker_count,
+            SUM(t.total_hours_worked) as total_hours,
+            MIN(t.date) as start_date,
+            MAX(t.date) as end_date
+          FROM timecards t
+          WHERE 1=1 ${dateFilter}
+        `);
+        
+        results.timecards = timecardSummary[0];
+        console.log(`[DB] Timecard summary:`, results.timecards);
       }
       
       return results;
@@ -2381,6 +2418,23 @@ app.post('/api/smart-agent/chat', async (req, res) => {
             snippet: `Total: ${stats.total} | Active: ${stats.active_driver_status} | From ADP + existing data`
           });
           console.log('[Smart Agent] Added database statistics to context');
+        }
+        
+        // Add timecard data to context if available
+        if (pgResults.timecards) {
+          const tc = pgResults.timecards;
+          const totalHours = parseFloat(tc.total_hours || 0).toFixed(1);
+          const startDate = tc.start_date ? new Date(tc.start_date).toLocaleDateString() : 'N/A';
+          const endDate = tc.end_date ? new Date(tc.end_date).toLocaleDateString() : 'N/A';
+          
+          const timecardText = `[Database Timecards] ${tc.worker_count} workers logged ${totalHours} total hours across ${tc.entry_count} timecard entries from ${startDate} to ${endDate}.`;
+          contextSources.push(timecardText);
+          sources.push({
+            type: 'database',
+            title: 'Timecard Summary',
+            snippet: `${tc.worker_count} workers, ${totalHours} hours total (${startDate} - ${endDate})`
+          });
+          console.log('[Smart Agent] Added timecard data to context');
         }
         
         if (pgResults.drivers.length > 0) {
