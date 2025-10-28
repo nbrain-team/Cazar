@@ -2309,6 +2309,13 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       enabledDatabases.push('email');
     }
     
+    // Auto-enable PostgreSQL for queries about hours, timecards, workers, violations
+    const needsDatabase = message.toLowerCase().match(/hours?|timecard|worked|clock|driver|employee|violation|break|lunch/);
+    if (needsDatabase && !enabledDatabases.includes('postgres')) {
+      console.log('[Smart Agent] Auto-enabling PostgreSQL search for timecard/worker query');
+      enabledDatabases.push('postgres');
+    }
+    
     // Collect context from enabled sources
     const contextSources = [];
     const sources = [];
