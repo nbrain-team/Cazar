@@ -2263,8 +2263,8 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     
     console.log(`Smart Agent query: "${message}" with databases: [${enabledDatabases.join(', ')}]`);
     
-    // Check if this is an email-related query
-    const isEmailRelated = isEmailQuery(message);
+    // Check if this is an email-related query (using AI detection)
+    const isEmailRelated = await isEmailQuery(message);
     
     // Collect context from enabled sources
     const contextSources = [];
