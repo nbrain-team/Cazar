@@ -212,29 +212,86 @@ Make queries efficient with proper WHERE clauses and LIMIT when appropriate.`;
  * Format email query results using Claude for natural language response
  * @param {Array} results - Query results from database
  * @param {string} originalQuery - User's original question
+ * @param {Array} conversationHistory - Previous conversation for context and follow-ups
  * @returns {string} - Formatted response
  */
-export async function formatEmailQueryResults(results, originalQuery) {
+export async function formatEmailQueryResults(results, originalQuery, conversationHistory = []) {
   try {
-    const prompt = `You are a helpful assistant for Cazar Logistics operations. 
+    if (!results || results.length === 0) {
+      return `I don't have any email data available for "${originalQuery}". The email database may be empty or the specific information you're looking for hasn't been synced yet.`;
+    }
 
-The user asked: "${originalQuery}"
+    // Build conversation context for follow-up questions
+    let conversationContext = '';
+    if (conversationHistory && conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-4); // Last 2 exchanges
+      conversationContext = '\n\nPrevious Conversation (for follow-up context):\n' + 
+        recentHistory.map(msg => {
+          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+          return `${msg.role === 'user' ? 'User' : 'Assistant'}: ${content.substring(0, 500)}`;
+        }).join('\n\n');
+    }
 
-Query Results (JSON):
+    const prompt = `You are an EXECUTIVE ASSISTANT for Rudy Cazar, President of Cazar Logistics (Amazon delivery service).
+
+User Query: "${originalQuery}"
+${conversationContext}
+
+Email Data (${results.length} results):
 ${JSON.stringify(results, null, 2)}
 
-Provide a clear, concise, professional response that:
-1. Directly answers their question
-2. Highlights key insights or patterns
-3. Mentions specific numbers/metrics
-4. Identifies any concerning trends (e.g., long response times, pending items)
-5. Suggests next actions if relevant
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
 
-Keep response under 200 words but informative.`;
+1. **BE INSIGHTFUL & ACTIONABLE** - Don't just summarize. Provide:
+   - Business implications
+   - Risk assessment (what could go wrong if ignored?)
+   - Specific recommended actions
+   - Deadlines and urgency indicators
+
+2. **PRIORITIZE RUTHLESSLY** - Lead with what matters MOST:
+   - What requires immediate attention?
+   - What has financial/legal/safety implications?
+   - What's time-sensitive?
+
+3. **PROVIDE FULL CONTEXT** - Include:
+   - WHO sent it (full names, roles when evident)
+   - WHEN (specific dates, how urgent)
+   - WHAT they want/need
+   - WHY it matters to the business
+   - WHAT happens if not addressed
+
+4. **HANDLE FOLLOW-UPS INTELLIGENTLY** - If user asks:
+   - "Who sent this?" → Reference the specific email from previous context
+   - "When?" → Give exact dates/times
+   - "What should I do?" → Provide specific next steps
+   
+5. **FORMAT FOR EXECUTIVE CONSUMPTION**:
+   - Use **bold** for critical items
+   - Use bullet points for clarity
+   - Put urgent items at the top
+   - End with "Recommended Actions" section if applicable
+
+6. **BE SPECIFIC** - No vague answers:
+   ❌ "There are some policy issues to address"
+   ✅ "Your Employment Practices Liability Policy (#CMLSRW6SFRP1224) expires December 19, 2025 (52 days). Contact Brianna Valentin at USI immediately to renew."
+
+Example Response Structure:
+**🚨 URGENT ITEMS**
+- [Specific urgent matter with deadline and action]
+
+**📋 KEY INSIGHTS**
+- [Pattern or important finding]
+- [Another key insight]
+
+**✅ RECOMMENDED ACTIONS**
+1. [Specific action with deadline]
+2. [Next step]
+
+Respond as if you're briefing a busy executive who needs to make quick decisions.`;
 
     const message = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 1024,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     });
 
@@ -247,25 +304,58 @@ Keep response under 200 words but informative.`;
 }
 
 /**
- * Detect if a query is email-related
+ * Detect if a query is email-related using AI
  * @param {string} query - User query
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-export function isEmailQuery(query) {
-  const emailKeywords = [
-    'email', 'message', 'request', 'response', 'pto', 'payroll', 
-    'uniform', 'fleet', 'incident', 'forwarded', 'pending',
-    'turnaround', 'response time', 'attachment', 'driver request',
-    'hours without response', 'average response', 'submitted',
-    'handled', 'assigned', 'category', 'policy', 'insurance',
-    'liability', 'claim', 'renewal', 'expiration', 'expiring',
-    'broker', 'coverage', 'premium', 'correspondence', 'communication',
-    'sent yesterday', 'sent today', 'sent last week', 'received from',
-    'thread', 'conversation', 'inbox', 'mailbox'
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  return emailKeywords.some(keyword => lowerQuery.includes(keyword));
+export async function isEmailQuery(query) {
+  try {
+    // Quick keyword check first for obvious cases (fast path)
+    const obviousEmailKeywords = ['email', 'inbox', 'mailbox', 'sent me', 'forwarded'];
+    const lowerQuery = query.toLowerCase();
+    if (obviousEmailKeywords.some(k => lowerQuery.includes(k))) {
+      return true;
+    }
+    
+    // Use Claude to intelligently determine if emails should be searched
+    const prompt = `You are a query intent analyzer for a logistics operations system. The system has access to:
+1. Email communications (company emails, driver requests, HR correspondence, insurance, policies, claims, etc.)
+2. Database records (timecards, violations, schedules, performance metrics)
+3. Knowledge base documents
+
+User query: "${query}"
+
+Should this query search the EMAIL database? Consider:
+- Questions about communications, correspondence, messages
+- Insurance, policies, claims, renewals, coverage
+- Requests from/to people (PTO, uniforms, scheduling, payroll)
+- Company announcements, notifications, alerts
+- Specific people's communications or sent items
+- Anything that would typically be communicated via email
+
+Respond with ONLY "YES" or "NO" (one word).`;
+
+    const message = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 10,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const response = message.content[0].text.trim().toUpperCase();
+    const shouldSearch = response === 'YES';
+    
+    console.log(`[Email Detection] Query: "${query.substring(0, 50)}..." → ${shouldSearch ? 'SEARCH EMAILS' : 'SKIP EMAILS'}`);
+    return shouldSearch;
+    
+  } catch (error) {
+    console.error('[Email Detection] Error:', error.message);
+    // Fallback to keyword matching on error
+    const emailKeywords = [
+      'email', 'message', 'policy', 'insurance', 'liability', 'claim', 
+      'renewal', 'expiration', 'correspondence', 'communication'
+    ];
+    return emailKeywords.some(k => query.toLowerCase().includes(k));
+  }
 }
 
 export default {

@@ -2281,8 +2281,8 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         
         const emailResults = await pool.query(sql, params || []);
         
-        // Format results using Claude
-        const formattedResponse = await formatEmailQueryResults(emailResults.rows, message);
+        // Format results using Claude with conversation history for follow-ups
+        const formattedResponse = await formatEmailQueryResults(emailResults.rows, message, conversationHistory);
         
         // Add to context
         contextSources.push(`[Email Analytics] ${formattedResponse}`);
@@ -3024,8 +3024,8 @@ app.post('/api/email-analytics/query', async (req, res) => {
     // Execute query
     const result = await pool.query(sql, params || []);
     
-    // Format results using Claude
-    const formattedResponse = await formatEmailQueryResults(result.rows, query);
+    // Format results using Claude (no conversation history in direct API call)
+    const formattedResponse = await formatEmailQueryResults(result.rows, query, []);
     
     res.json({
       response: formattedResponse,
