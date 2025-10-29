@@ -3061,6 +3061,54 @@ app.get('/api/email-analytics/sync-status', async (req, res) => {
   res.json(currentSyncStatus);
 });
 
+// GET /api/email-analytics/test-date-range - Test fetching specific date range
+app.get('/api/email-analytics/test-date-range', async (req, res) => {
+  try {
+    const { daysBack = 30 } = req.query;
+    
+    const endDate = new Date();
+    const startDate = new Date(Date.now() - (daysBack * 24 * 60 * 60 * 1000));
+    
+    console.log(`[Test] Fetching emails from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    
+    const { fetchEmailsByDateRange } = await import('./lib/emailFetchService.mjs');
+    const emails = await fetchEmailsByDateRange(startDate, endDate, { maxPerMailbox: 100 });
+    
+    // Group by date
+    const byDate = {};
+    emails.forEach(email => {
+      const date = new Date(email.receivedDateTime).toLocaleDateString();
+      byDate[date] = (byDate[date] || 0) + 1;
+    });
+    
+    const sortedDates = Object.keys(byDate).sort();
+    
+    res.json({
+      success: true,
+      totalEmails: emails.length,
+      dateRange: {
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        daysRequested: daysBack
+      },
+      actualRange: {
+        oldest: emails.length > 0 ? emails[emails.length - 1].receivedDateTime : null,
+        newest: emails.length > 0 ? emails[0].receivedDateTime : null
+      },
+      emailsByDate: byDate,
+      dateList: sortedDates,
+      sampleEmails: emails.slice(0, 5).map(e => ({
+        date: e.receivedDateTime,
+        from: e.from?.emailAddress?.address,
+        subject: e.subject
+      }))
+    });
+  } catch (error) {
+    console.error('[Test] Error:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 // GET /api/email-analytics/stats - Get email analytics statistics
 app.get('/api/email-analytics/stats', async (req, res) => {
   try {
