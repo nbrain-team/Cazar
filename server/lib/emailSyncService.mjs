@@ -259,7 +259,7 @@ export async function syncEmails(options = {}) {
           console.log(`[Email Sync] No emails for this day - skipping`);
           overallResults.dayResults.push({
             day: day + 1,
-            date: dayDate.toLocaleDateString(),
+            date: endDate.toLocaleDateString(),
             processed: 0,
             skipped: 0,
             errors: 0
@@ -304,7 +304,7 @@ export async function syncEmails(options = {}) {
         overallResults.errors += dayErrors;
         overallResults.dayResults.push({
           day: day + 1,
-          date: dayDate.toLocaleDateString(),
+          date: endDate.toLocaleDateString(),
           processed: dayProcessed,
           skipped: daySkipped,
           errors: dayErrors
@@ -314,7 +314,7 @@ export async function syncEmails(options = {}) {
         console.error(`[Email Sync] Error processing day ${day + 1}:`, dayError.message);
         overallResults.dayResults.push({
           day: day + 1,
-          date: dayDate.toLocaleDateString(),
+          date: endDate.toLocaleDateString(),
           processed: 0,
           skipped: 0,
           errors: 1,
