@@ -93,7 +93,9 @@ export async function fetchUserEmails(userId, options = {}) {
       skip = 0,
       filter = null,
       orderby = 'receivedDateTime DESC',
-      select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,body,hasAttachments,conversationId,parentFolderId,isRead,importance,categories'
+      select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,bodyPreview,body,hasAttachments,conversationId,parentFolderId,isRead,importance,categories',
+      usePagination = false,
+      maxResults = 999 // Microsoft Graph max per request
     } = options;
 
     const client = await getGraphClient();
@@ -102,15 +104,42 @@ export async function fetchUserEmails(userId, options = {}) {
       .api(`/users/${userId}/messages`)
       .select(select)
       .orderby(orderby)
-      .top(top)
+      .top(usePagination ? 999 : top) // Use max when paginating
       .skip(skip);
     
     if (filter) {
       request = request.filter(filter);
     }
     
-    const response = await request.get();
-    return response.value || [];
+    // If pagination is enabled, fetch all results
+    if (usePagination) {
+      const allEmails = [];
+      let response = await request.get();
+      
+      while (response) {
+        if (response.value && response.value.length > 0) {
+          allEmails.push(...response.value);
+          
+          // Stop if we've reached maxResults
+          if (allEmails.length >= maxResults) {
+            return allEmails.slice(0, maxResults);
+          }
+        }
+        
+        // Check if there's a next page
+        if (response['@odata.nextLink']) {
+          response = await client.api(response['@odata.nextLink']).get();
+        } else {
+          break;
+        }
+      }
+      
+      return allEmails;
+    } else {
+      // Single request (legacy behavior)
+      const response = await request.get();
+      return response.value || [];
+    }
     
   } catch (error) {
     console.error(`Error fetching emails for user ${userId}:`, error);
@@ -254,9 +283,10 @@ export async function fetchEmailsByDateRange(startDate, endDate, options = {}) {
     for (const mailbox of targetMailboxes) {
       try {
         const emails = await fetchUserEmails(mailbox.email, {
-          top: maxPerMailbox,
           filter: `receivedDateTime ge ${startISO} and receivedDateTime le ${endISO}`,
-          orderby: 'receivedDateTime DESC'
+          orderby: 'receivedDateTime DESC',
+          usePagination: true,
+          maxResults: maxPerMailbox
         });
         
         console.log(`[Email Fetch]   ${mailbox.name}: ${emails.length} emails`);
