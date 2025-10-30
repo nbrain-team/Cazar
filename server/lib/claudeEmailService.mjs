@@ -211,6 +211,7 @@ Make queries efficient with proper WHERE clauses and LIMIT when appropriate.`;
     } catch (parseError) {
       console.error('[Email Query] JSON parse error. Content:', jsonMatch[0].substring(0, 500));
       throw new Error(`JSON parse error: ${parseError.message}`);
+    }
     
   } catch (error) {
     console.error('Query generation error:', error);
