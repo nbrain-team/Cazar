@@ -2641,7 +2641,7 @@ ${conversationContext}`;
       response = completion.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response.';
       
     } catch (aiError) {
-      console.error('OpenAI API error:', aiError.message);
+      console.error('Claude API error:', aiError.message);
       
       // Provide helpful response even without AI
       if (sources.length > 0) {
@@ -2653,10 +2653,10 @@ ${conversationContext}`;
           if (s.snippet) response += `   ${s.snippet}\n`;
           response += `\n`;
         });
-        response += `\n*Note: AI analysis unavailable. ${aiError.message.includes('billing') ? 'Please check OpenAI billing settings.' : 'Please try again later.'}*`;
+        response += `\n*Note: AI analysis unavailable. ${aiError.message.includes('credit') ? 'Please check Anthropic API credits.' : 'Please try again later.'}*`;
       } else {
         response = `# Service Temporarily Unavailable\n\n`;
-        response += `The AI service is currently unavailable. ${aiError.message.includes('billing') ? '**Please check OpenAI API billing settings.**' : 'Please try again in a moment.'}\n\n`;
+        response += `The AI service is currently unavailable. ${aiError.message.includes('credit') ? '**Please check Anthropic API credits.**' : 'Please try again in a moment.'}\n\n`;
         response += `**Your question:** ${message}\n\n`;
         response += `I'll be able to provide intelligent answers once the service is restored.`;
       }
