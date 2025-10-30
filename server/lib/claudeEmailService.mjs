@@ -5,7 +5,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514'; // Claude 4.5
+const CLAUDE_MODEL = 'claude-3-opus-20240229'; // Claude 3 Opus (most capable)
 
 /**
  * Analyze an email using Claude 4.5 to extract metadata and categorize
