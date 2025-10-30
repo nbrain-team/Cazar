@@ -736,65 +736,45 @@ async function queryOperationsDB(args) {
       break;
 
     case 'break_violations':
-      // Query for drivers who worked 6+ hours without lunch break
+      // Query timecards for drivers who worked 6+ hours without lunch break (using recent data)
       sql = `
-        WITH daily_work AS (
-          SELECT 
-            s.driver_id,
-            d.driver_name,
-            DATE(s.start_utc) as work_date,
-            SUM(s.minutes) as total_minutes,
-            COUNT(DISTINCT DATE(s.start_utc)) as days_worked
-          FROM on_duty_segments s
-          LEFT JOIN drivers d ON s.driver_id = d.driver_id
-          WHERE s.start_utc >= NOW() - INTERVAL '${days_back} days'
-          GROUP BY s.driver_id, d.driver_name, DATE(s.start_utc)
-          HAVING SUM(s.minutes) >= 360
-        ),
-        lunch_breaks AS (
-          SELECT 
-            driver_id,
-            DATE(start_utc) as break_date,
-            COUNT(*) as break_count,
-            SUM(minutes) as break_minutes
-          FROM break_segments
-          WHERE label ILIKE '%lunch%'
-            AND start_utc >= NOW() - INTERVAL '${days_back} days'
-          GROUP BY driver_id, DATE(start_utc)
-        )
         SELECT 
-          dw.driver_id,
-          dw.driver_name,
-          dw.work_date,
-          dw.total_minutes,
-          ROUND(dw.total_minutes / 60.0, 1) as hours_worked,
-          dw.days_worked,
-          COALESCE(lb.break_count, 0) as lunch_breaks_taken,
-          COALESCE(lb.break_minutes, 0) as lunch_break_minutes,
+          t.timecard_id,
+          t.employee_id as driver_id,
+          d.driver_name,
+          t.date as work_date,
+          t.clock_in_time,
+          t.clock_out_time,
+          t.total_hours_worked as hours_worked,
+          t.break_start_time,
+          t.break_end_time,
           CASE 
-            WHEN COALESCE(lb.break_count, 0) = 0 THEN '❌ NO LUNCH'
-            WHEN COALESCE(lb.break_minutes, 0) < 30 THEN '⚠️ SHORT LUNCH'
+            WHEN t.break_start_time IS NULL OR t.break_end_time IS NULL THEN '❌ NO LUNCH RECORDED'
+            WHEN EXTRACT(EPOCH FROM (t.break_end_time - t.break_start_time))/60 < 30 THEN '⚠️ SHORT LUNCH'
             ELSE '✅ OK'
-          END as lunch_status
-        FROM daily_work dw
-        LEFT JOIN lunch_breaks lb ON dw.driver_id = lb.driver_id AND dw.work_date = lb.break_date
-        WHERE COALESCE(lb.break_count, 0) = 0
-        ORDER BY dw.work_date DESC, dw.total_minutes DESC
+          END as lunch_status,
+          EXTRACT(EPOCH FROM (t.break_end_time - t.break_start_time))/60 as lunch_minutes
+        FROM timecards t
+        LEFT JOIN drivers d ON t.employee_id = d.driver_id
+        WHERE t.total_hours_worked >= 6.0
+          AND t.date >= NOW() - INTERVAL '${days_back} days'
+          AND (t.break_start_time IS NULL OR t.break_end_time IS NULL OR EXTRACT(EPOCH FROM (t.break_end_time - t.break_start_time))/60 < 30)
+        ORDER BY t.date DESC, t.total_hours_worked DESC
         LIMIT $1`;
       params = [limit];
       break;
 
     case 'consecutive_days':
-      // Query for drivers working 6+ consecutive days
+      // Query timecards for drivers working 6+ consecutive days (using recent data)
       sql = `
         WITH daily_work AS (
           SELECT DISTINCT
-            s.driver_id,
+            t.employee_id as driver_id,
             d.driver_name,
-            DATE(s.start_utc) as work_date
-          FROM on_duty_segments s
-          LEFT JOIN drivers d ON s.driver_id = d.driver_id
-          WHERE s.start_utc >= NOW() - INTERVAL '${days_back} days'
+            t.date as work_date
+          FROM timecards t
+          LEFT JOIN drivers d ON t.employee_id = d.driver_id
+          WHERE t.date >= NOW() - INTERVAL '${days_back} days'
         ),
         consecutive AS (
           SELECT 
