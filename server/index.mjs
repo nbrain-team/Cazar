@@ -2533,28 +2533,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       // - Queried via SQL for better performance
       
       // Skip the Graph API search - data is already in PostgreSQL
-      /*
-      try {
-        console.log('[Smart Agent] Searching Microsoft 365 for:', message);
-        const msResults = await searchMicrosoft365(message);
-        
-        // Provide detailed error context
-        let errorContext = '';
-        if (error.message.includes('consent') || error.message.includes('Forbidden') || error.message.includes('403')) {
-          errorContext = 'Microsoft 365 integration requires admin consent in Azure Portal. App ID: fe9e4018-6e34-4662-8989-18ef789f727d. Required permissions: User.Read.All, Mail.Read, Calendars.Read, Team.ReadBasic.All, ChannelMessage.Read.All, Files.Read.All, Sites.Read.All. See MICROSOFT-365-SETUP-GUIDE.md for instructions.';
-        } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          errorContext = 'Microsoft 365 authentication failed. Check that MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID are correctly set in environment variables.';
-        } else {
-          errorContext = `Microsoft 365 API error: ${error.message}`;
-        }
-        
-        contextSources.push(`[Microsoft 365 ERROR] ${errorContext}`);
-        sources.push({
-          type: 'microsoft',
-          title: '⚠️ Microsoft 365 Connection Issue',
-          snippet: errorContext
-        });
-      }
+      // Old Graph API code commented out - now using PostgreSQL synced data instead
     }
     
     // Search ADP if enabled
