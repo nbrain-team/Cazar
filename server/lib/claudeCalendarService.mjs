@@ -199,9 +199,48 @@ Create a professional summary that:
   }
 }
 
+/**
+ * Detect if a query is asking about calendar/meetings
+ * @param {string} query - User query
+ * @returns {boolean} - True if calendar-related
+ */
+export async function isCalendarQuery(query) {
+  try {
+    // Quick keyword check first
+    const calendarKeywords = ['meeting', 'calendar', 'schedule', 'appointment', 'event'];
+    const lowerQuery = query.toLowerCase();
+    if (calendarKeywords.some(k => lowerQuery.includes(k))) {
+      return true;
+    }
+
+    // Use Claude for intelligent detection
+    const prompt = `Is this query asking about calendar events, meetings, or schedules?
+
+Query: "${query}"
+
+Respond with ONLY "YES" or "NO" (one word).`;
+
+    const message = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 10,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const response = message.content[0].text.trim().toUpperCase();
+    return response === 'YES';
+
+  } catch (error) {
+    console.error('[Calendar Detection] Error:', error.message);
+    // Fallback to keyword matching
+    const keywords = ['meeting', 'calendar', 'schedule', 'appointment', 'event', 'upcoming', 'deadline'];
+    return keywords.some(k => query.toLowerCase().includes(k));
+  }
+}
+
 export default {
   analyzeCalendarEvent,
   generateCalendarQuery,
-  formatCalendarResults
+  formatCalendarResults,
+  isCalendarQuery
 };
 

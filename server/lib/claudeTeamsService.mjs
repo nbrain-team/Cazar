@@ -198,9 +198,48 @@ Create a professional summary that:
   }
 }
 
+/**
+ * Detect if a query is asking about Teams messages/discussions
+ * @param {string} query - User query
+ * @returns {boolean} - True if Teams-related
+ */
+export async function isTeamsQuery(query) {
+  try {
+    // Quick keyword check first
+    const teamsKeywords = ['team', 'teams', 'channel', 'discussion', 'chat'];
+    const lowerQuery = query.toLowerCase();
+    if (teamsKeywords.some(k => lowerQuery.includes(k))) {
+      return true;
+    }
+
+    // Use Claude for intelligent detection
+    const prompt = `Is this query asking about Teams messages, team discussions, or team communications?
+
+Query: "${query}"
+
+Respond with ONLY "YES" or "NO" (one word).`;
+
+    const message = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 10,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const response = message.content[0].text.trim().toUpperCase();
+    return response === 'YES';
+
+  } catch (error) {
+    console.error('[Teams Detection] Error:', error.message);
+    // Fallback to keyword matching
+    const keywords = ['team', 'teams', 'channel', 'discussion', 'chat', 'collaborate'];
+    return keywords.some(k => query.toLowerCase().includes(k));
+  }
+}
+
 export default {
   analyzeTeamsMessage,
   generateTeamsQuery,
-  formatTeamsResults
+  formatTeamsResults,
+  isTeamsQuery
 };
 

@@ -2302,6 +2302,12 @@ import {
   getFoldersByName 
 } from './lib/documentService.mjs';
 
+// Import Calendar & Teams Sync Services
+import { syncCalendarEvents } from './lib/calendarSyncService.mjs';
+import { syncTeamsMessages } from './lib/teamsSyncService.mjs';
+import { generateCalendarQuery, formatCalendarResults, isCalendarQuery } from './lib/claudeCalendarService.mjs';
+import { generateTeamsQuery, formatTeamsResults, isTeamsQuery } from './lib/claudeTeamsService.mjs';
+
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
   try {
@@ -2313,8 +2319,10 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     
     console.log(`Smart Agent query: "${message}" with databases: [${enabledDatabases.join(', ')}]`);
     
-    // Check if this is an email-related query (using AI detection)
+    // Check query type using AI detection
     const isEmailRelated = await isEmailQuery(message);
+    const isCalendarRelated = await isCalendarQuery(message);
+    const isTeamsRelated = await isTeamsQuery(message);
     
     // Auto-enable email search if AI detects it should be used
     if (isEmailRelated && !enabledDatabases.includes('email')) {
@@ -2359,17 +2367,73 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         
         console.log(`[Smart Agent] Email Analytics: ${emailResults.rows.length} results`);
         
-        // For pure email queries, return immediately with Claude's response
-        if (!enabledDatabases.some(db => ['pinecone', 'web', 'postgres'].includes(db))) {
-          return res.json({
-            response: formattedResponse,
-            sources: sources,
-            timestamp: new Date().toISOString()
-          });
-        }
       } catch (error) {
         console.error('[Smart Agent] Email Analytics error:', error.message);
         contextSources.push(`[Email Analytics] Error: ${error.message}`);
+      }
+    }
+    
+    // Handle calendar queries with Claude
+    if (isCalendarRelated && enabledDatabases.includes('email')) {
+      try {
+        console.log('[Smart Agent] Calendar query detected - using Claude Calendar Analytics');
+        
+        // Generate and execute SQL query using Claude
+        const { sql, params, explanation } = await generateCalendarQuery(message);
+        console.log(`[Smart Agent] Generated Calendar SQL: ${sql}`);
+        
+        const calendarResults = await pool.query(sql, params || []);
+        
+        // Format results using Claude
+        const formattedResponse = await formatCalendarResults(calendarResults.rows, message);
+        
+        // Add to context
+        contextSources.push(`[Calendar] ${formattedResponse}`);
+        sources.push({
+          type: 'calendar',
+          title: 'Calendar Events',
+          snippet: `${calendarResults.rows.length} events found`,
+          data: calendarResults.rows,
+          explanation
+        });
+        
+        console.log(`[Smart Agent] Calendar: ${calendarResults.rows.length} results`);
+        
+      } catch (error) {
+        console.error('[Smart Agent] Calendar error:', error.message);
+        contextSources.push(`[Calendar] Error: ${error.message}`);
+      }
+    }
+    
+    // Handle Teams queries with Claude
+    if (isTeamsRelated && enabledDatabases.includes('email')) {
+      try {
+        console.log('[Smart Agent] Teams query detected - using Claude Teams Analytics');
+        
+        // Generate and execute SQL query using Claude
+        const { sql, params, explanation } = await generateTeamsQuery(message);
+        console.log(`[Smart Agent] Generated Teams SQL: ${sql}`);
+        
+        const teamsResults = await pool.query(sql, params || []);
+        
+        // Format results using Claude
+        const formattedResponse = await formatTeamsResults(teamsResults.rows, message);
+        
+        // Add to context
+        contextSources.push(`[Teams] ${formattedResponse}`);
+        sources.push({
+          type: 'teams',
+          title: 'Teams Messages',
+          snippet: `${teamsResults.rows.length} messages found`,
+          data: teamsResults.rows,
+          explanation
+        });
+        
+        console.log(`[Smart Agent] Teams: ${teamsResults.rows.length} results`);
+        
+      } catch (error) {
+        console.error('[Smart Agent] Teams error:', error.message);
+        contextSources.push(`[Teams] Error: ${error.message}`);
       }
     }
     
@@ -3217,6 +3281,148 @@ app.post('/api/email-analytics/initialize', async (req, res) => {
   } catch (error) {
     console.error('[API] Initialize error:', error);
     res.status(500).json({ error: 'init_failed', message: error.message });
+  }
+});
+
+// ============================================================================
+// CALENDAR & TEAMS SYNC API
+// ============================================================================
+
+// POST /api/calendar/sync - Sync calendar events from Microsoft 365
+app.post('/api/calendar/sync', async (req, res) => {
+  try {
+    const { daysBack = 30, daysForward = 90, maxPerUser = 200 } = req.body;
+    
+    console.log(`[API] Starting calendar sync: ${daysBack} days back, ${daysForward} days forward`);
+    
+    const stats = await syncCalendarEvents(pool, {
+      daysBack,
+      daysForward,
+      maxPerUser,
+      analyzeWithClaude: true
+    });
+    
+    res.json({
+      success: true,
+      stats,
+      message: `Synced ${stats.eventsAdded + stats.eventsUpdated} calendar events (${stats.eventsAdded} new, ${stats.eventsUpdated} updated)`
+    });
+    
+  } catch (error) {
+    console.error('[API] Calendar sync error:', error);
+    res.status(500).json({ error: 'calendar_sync_failed', message: error.message });
+  }
+});
+
+// POST /api/teams/sync - Sync Teams messages from Microsoft 365
+app.post('/api/teams/sync', async (req, res) => {
+  try {
+    const { daysBack = 30, maxPerChannel = 100 } = req.body;
+    
+    console.log(`[API] Starting Teams sync: ${daysBack} days back`);
+    
+    const stats = await syncTeamsMessages(pool, {
+      daysBack,
+      maxPerChannel,
+      analyzeWithClaude: true
+    });
+    
+    res.json({
+      success: true,
+      stats,
+      message: `Synced ${stats.messagesAdded + stats.messagesUpdated} Teams messages (${stats.messagesAdded} new, ${stats.messagesUpdated} updated)`
+    });
+    
+  } catch (error) {
+    console.error('[API] Teams sync error:', error);
+    res.status(500).json({ error: 'teams_sync_failed', message: error.message });
+  }
+});
+
+// POST /api/calendar-teams/sync-all - Sync both calendar and Teams
+app.post('/api/calendar-teams/sync-all', async (req, res) => {
+  try {
+    const { 
+      daysBack = 30, 
+      daysForward = 90,
+      maxPerUser = 200,
+      maxPerChannel = 100
+    } = req.body;
+    
+    console.log('[API] Starting full calendar & Teams sync');
+    
+    // Run both syncs in parallel
+    const [calendarStats, teamsStats] = await Promise.all([
+      syncCalendarEvents(pool, { daysBack, daysForward, maxPerUser, analyzeWithClaude: true }),
+      syncTeamsMessages(pool, { daysBack, maxPerChannel, analyzeWithClaude: true })
+    ]);
+    
+    res.json({
+      success: true,
+      calendar: calendarStats,
+      teams: teamsStats,
+      message: `Synced ${calendarStats.eventsAdded + calendarStats.eventsUpdated} calendar events and ${teamsStats.messagesAdded + teamsStats.messagesUpdated} Teams messages`
+    });
+    
+  } catch (error) {
+    console.error('[API] Full sync error:', error);
+    res.status(500).json({ error: 'full_sync_failed', message: error.message });
+  }
+});
+
+// POST /api/calendar/query - Query calendar with natural language
+app.post('/api/calendar/query', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'query_required' });
+    }
+    
+    console.log(`[API] Calendar query: "${query}"`);
+    
+    const { sql, params, explanation } = await generateCalendarQuery(query);
+    const result = await pool.query(sql, params || []);
+    const formatted = await formatCalendarResults(result.rows, query);
+    
+    res.json({
+      response: formatted,
+      data: result.rows,
+      explanation,
+      query_executed: sql
+    });
+    
+  } catch (error) {
+    console.error('[API] Calendar query error:', error);
+    res.status(500).json({ error: 'calendar_query_failed', message: error.message });
+  }
+});
+
+// POST /api/teams/query - Query Teams with natural language
+app.post('/api/teams/query', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'query_required' });
+    }
+    
+    console.log(`[API] Teams query: "${query}"`);
+    
+    const { sql, params, explanation } = await generateTeamsQuery(query);
+    const result = await pool.query(sql, params || []);
+    const formatted = await formatTeamsResults(result.rows, query);
+    
+    res.json({
+      response: formatted,
+      data: result.rows,
+      explanation,
+      query_executed: sql
+    });
+    
+  } catch (error) {
+    console.error('[API] Teams query error:', error);
+    res.status(500).json({ error: 'teams_query_failed', message: error.message });
   }
 });
 
