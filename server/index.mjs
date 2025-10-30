@@ -2289,6 +2289,17 @@ import { runSophisticatedAgent, formatAgentResponse } from './lib/sophisticatedA
 import { generateEmailQuery, formatEmailQueryResults, isEmailQuery } from './lib/claudeEmailService.mjs';
 import { syncEmails, initializeEmailAnalytics, getSyncStats } from './lib/emailSyncService.mjs';
 
+// Import Document Service for OneDrive/SharePoint access
+import { 
+  getUserDrive, 
+  listDriveContents, 
+  searchDriveContents, 
+  getFileMetadata, 
+  getFileDownloadUrl,
+  listSharePointSites,
+  getFoldersByName 
+} from './lib/documentService.mjs';
+
 // POST /api/smart-agent/chat - Main Smart Agent endpoint
 app.post('/api/smart-agent/chat', async (req, res) => {
   try {
@@ -3235,6 +3246,108 @@ app.post('/api/email-analytics/initialize', async (req, res) => {
   } catch (error) {
     console.error('[API] Initialize error:', error);
     res.status(500).json({ error: 'init_failed', message: error.message });
+  }
+});
+
+// ============================================================================
+// DOCUMENT ACCESS API - OneDrive & SharePoint
+// ============================================================================
+
+// GET /api/documents/drive/:email - Get user's OneDrive info
+app.get('/api/documents/drive/:email', async (req, res) => {
+  try {
+    const userEmail = req.params.email;
+    const driveInfo = await getUserDrive(userEmail);
+    res.json(driveInfo);
+  } catch (error) {
+    console.error('[API] Get drive error:', error);
+    res.status(500).json({ error: 'get_drive_failed', message: error.message });
+  }
+});
+
+// GET /api/documents/list/:email - List OneDrive contents
+app.get('/api/documents/list/:email', async (req, res) => {
+  try {
+    const userEmail = req.params.email;
+    const { path = 'root', limit = 50 } = req.query;
+    const contents = await listDriveContents(userEmail, path, parseInt(limit));
+    res.json(contents);
+  } catch (error) {
+    console.error('[API] List contents error:', error);
+    res.status(500).json({ error: 'list_contents_failed', message: error.message });
+  }
+});
+
+// GET /api/documents/search/:email - Search OneDrive
+app.get('/api/documents/search/:email', async (req, res) => {
+  try {
+    const userEmail = req.params.email;
+    const { q, limit = 20 } = req.query;
+    
+    if (!q) {
+      return res.status(400).json({ error: 'missing_query', message: 'Query parameter "q" is required' });
+    }
+    
+    const results = await searchDriveContents(userEmail, q, parseInt(limit));
+    res.json(results);
+  } catch (error) {
+    console.error('[API] Search error:', error);
+    res.status(500).json({ error: 'search_failed', message: error.message });
+  }
+});
+
+// GET /api/documents/file/:email/:fileId - Get file metadata
+app.get('/api/documents/file/:email/:fileId', async (req, res) => {
+  try {
+    const { email: userEmail, fileId } = req.params;
+    const metadata = await getFileMetadata(userEmail, fileId);
+    res.json(metadata);
+  } catch (error) {
+    console.error('[API] Get file metadata error:', error);
+    res.status(500).json({ error: 'get_metadata_failed', message: error.message });
+  }
+});
+
+// GET /api/documents/download/:email/:fileId - Get file download URL
+app.get('/api/documents/download/:email/:fileId', async (req, res) => {
+  try {
+    const { email: userEmail, fileId } = req.params;
+    const downloadInfo = await getFileDownloadUrl(userEmail, fileId);
+    res.json(downloadInfo);
+  } catch (error) {
+    console.error('[API] Get download URL error:', error);
+    res.status(500).json({ error: 'get_download_failed', message: error.message });
+  }
+});
+
+// GET /api/documents/sharepoint - List SharePoint sites
+app.get('/api/documents/sharepoint', async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+    const sites = await listSharePointSites(parseInt(limit));
+    res.json(sites);
+  } catch (error) {
+    console.error('[API] List SharePoint sites error:', error);
+    res.status(500).json({ error: 'list_sharepoint_failed', message: error.message });
+  }
+});
+
+// GET /api/documents/folders/:email - Get specific folders by name
+app.get('/api/documents/folders/:email', async (req, res) => {
+  try {
+    const userEmail = req.params.email;
+    const { names } = req.query;
+    
+    if (!names) {
+      return res.status(400).json({ error: 'missing_names', message: 'Query parameter "names" is required (comma-separated folder names)' });
+    }
+    
+    const folderNames = names.split(',').map(n => n.trim());
+    const folders = await getFoldersByName(userEmail, folderNames);
+    res.json(folders);
+  } catch (error) {
+    console.error('[API] Get folders error:', error);
+    res.status(500).json({ error: 'get_folders_failed', message: error.message });
   }
 });
 
