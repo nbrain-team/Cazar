@@ -163,9 +163,15 @@ export async function generateEmailQuery(userQuery) {
 User Query: "${userQuery}"
 
 Database Schema:
-- email_analytics table with columns: message_id, from_name, from_email, subject, category, request_type, 
-  received_date, is_request, is_response, status, responded_by, response_time_hours, has_attachment, 
-  forwarded_to, priority, urgency, sentiment, etc.
+- email_analytics table with columns: message_id, from_name, from_email (TEXT), to_emails (TEXT ARRAY), 
+  cc_emails (TEXT ARRAY), subject, body_preview, category, request_type, received_date, is_request, 
+  is_response, status, responded_by, response_time_hours, has_attachment, forwarded_to (TEXT ARRAY), 
+  priority, urgency, sentiment, action_items (JSONB array), etc.
+
+IMPORTANT: 
+- to_emails, cc_emails, forwarded_to are TEXT ARRAYS (use: 'email' = ANY(to_emails) OR to_emails::text ILIKE '%email%')
+- from_email is TEXT (use: from_email ILIKE '%name%')
+- For Rudy emails, use: from_email ILIKE '%Rudy%' OR 'Rudy@CazarNYC.com' = ANY(to_emails) OR to_emails::text ILIKE '%Rudy%'
 
 Available views:
 - unanswered_requests: Shows pending requests with hours_waiting
@@ -198,6 +204,7 @@ Make queries efficient with proper WHERE clauses and LIMIT when appropriate.`;
     // Remove markdown code blocks if present
     let cleanedContent = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
     
+    // Find JSON object
     const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) {
@@ -206,10 +213,20 @@ Make queries efficient with proper WHERE clauses and LIMIT when appropriate.`;
     }
     
     try {
-      const parsed = JSON.parse(jsonMatch[0]);
+      // Clean up the JSON string before parsing
+      let jsonStr = jsonMatch[0];
+      
+      // Replace literal \n in strings with actual newlines (common Claude issue)
+      // But be careful not to break valid JSON structure
+      jsonStr = jsonStr.replace(/\\n/g, ' ');
+      
+      const parsed = JSON.parse(jsonStr);
       return parsed;
     } catch (parseError) {
-      console.error('[Email Query] JSON parse error. Content:', jsonMatch[0].substring(0, 500));
+      console.error('[Email Query] JSON parse error.');
+      console.error('[Email Query] Original content:', content.substring(0, 500));
+      console.error('[Email Query] Extracted JSON:', jsonMatch[0].substring(0, 500));
+      console.error('[Email Query] Parse error:', parseError.message);
       throw new Error(`JSON parse error: ${parseError.message}`);
     }
     
