@@ -2523,31 +2523,20 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       }
     }
     
-    // Search Microsoft 365 if enabled
-    if (enabledDatabases.includes('microsoft')) {
+    // Microsoft 365 direct queries DISABLED - All data synced to PostgreSQL
+    // Emails, calendar, and Teams messages are synced to PostgreSQL for faster, pre-analyzed queries
+    if (enabledDatabases.includes('microsoft') || enabledDatabases.includes('email')) {
+      console.log('[Smart Agent] Microsoft 365 direct queries disabled - all data synced to PostgreSQL');
+      // Note: Real-time Graph API calls removed. All Microsoft data is now:
+      // - Synced to PostgreSQL (email_analytics, calendar_events, teams_messages)
+      // - Pre-analyzed by Claude
+      // - Queried via SQL for better performance
+      
+      // Skip the Graph API search - data is already in PostgreSQL
+      /*
       try {
         console.log('[Smart Agent] Searching Microsoft 365 for:', message);
         const msResults = await searchMicrosoft365(message);
-        
-        if (msResults.length > 0) {
-          console.log(`[Smart Agent] Microsoft 365 returned ${msResults.length} results`);
-          msResults.forEach(r => {
-            contextSources.push(`[Microsoft 365 - ${r.type}] ${r.title}: ${r.snippet}`);
-            sources.push({
-              type: 'microsoft',
-              title: `${r.type.toUpperCase()}: ${r.title}`,
-              snippet: r.snippet,
-              url: r.url
-            });
-          });
-        } else {
-          console.log('[Smart Agent] Microsoft 365 search returned 0 results');
-          // Add a note to context that M365 was searched but nothing found
-          contextSources.push('[Microsoft 365] No emails, calendar events, Teams messages, or files found matching the query.');
-        }
-      } catch (error) {
-        console.error('[Smart Agent] Microsoft 365 search error:', error.message);
-        console.error('[Smart Agent] Full error:', error);
         
         // Provide detailed error context
         let errorContext = '';
