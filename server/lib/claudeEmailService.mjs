@@ -193,14 +193,24 @@ Make queries efficient with proper WHERE clauses and LIMIT when appropriate.`;
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const content = message.content[0].text;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const content = message.content[0].text.trim();
+    
+    // Remove markdown code blocks if present
+    let cleanedContent = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    
+    const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) {
+      console.error('[Email Query] No JSON found in response:', content.substring(0, 200));
       throw new Error('Could not extract SQL query from Claude response');
     }
     
-    return JSON.parse(jsonMatch[0]);
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed;
+    } catch (parseError) {
+      console.error('[Email Query] JSON parse error. Content:', jsonMatch[0].substring(0, 500));
+      throw new Error(`JSON parse error: ${parseError.message}`);
     
   } catch (error) {
     console.error('Query generation error:', error);

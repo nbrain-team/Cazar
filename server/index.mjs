@@ -2319,10 +2319,14 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     
     console.log(`Smart Agent query: "${message}" with databases: [${enabledDatabases.join(', ')}]`);
     
-    // Check query type using AI detection
-    const isEmailRelated = await isEmailQuery(message);
-    const isCalendarRelated = await isCalendarQuery(message);
-    const isTeamsRelated = await isTeamsQuery(message);
+    // Run query type detection in parallel to save time
+    const [isEmailRelated, isCalendarRelated, isTeamsRelated] = await Promise.all([
+      isEmailQuery(message),
+      isCalendarQuery(message),
+      isTeamsQuery(message)
+    ]);
+    
+    console.log(`[Smart Agent] Query type detection: email=${isEmailRelated}, calendar=${isCalendarRelated}, teams=${isTeamsRelated}`);
     
     // Auto-enable email search if AI detects it should be used
     if (isEmailRelated && !enabledDatabases.includes('email')) {
@@ -2369,7 +2373,9 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         
       } catch (error) {
         console.error('[Smart Agent] Email Analytics error:', error.message);
-        contextSources.push(`[Email Analytics] Error: ${error.message}`);
+        console.error('[Smart Agent] Full error stack:', error.stack);
+        contextSources.push(`[Email Analytics] Error occurred but email data unavailable. Error: ${error.message}`);
+        // Don't add error to sources - better to have no results than confusing error messages
       }
     }
     
