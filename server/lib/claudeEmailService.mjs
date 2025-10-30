@@ -158,6 +158,41 @@ Return JSON with:
  */
 export async function generateEmailQuery(userQuery) {
   try {
+    // FAST PATH: Use simple pattern matching for common queries (bypass Claude)
+    const lowerQuery = userQuery.toLowerCase();
+    
+    // Priority/urgent emails for Rudy
+    if (lowerQuery.includes('priority') || lowerQuery.includes('priorities')) {
+      if (lowerQuery.includes('rudy')) {
+        return {
+          sql: `SELECT * FROM email_analytics 
+                WHERE (from_email ILIKE '%Rudy%' OR 'Rudy@CazarNYC.com' = ANY(to_emails) OR to_emails::text ILIKE '%Rudy%')
+                AND received_date >= NOW() - INTERVAL '14 days'
+                AND (priority = 'high' OR urgency = 'urgent' OR requires_action = true)
+                ORDER BY received_date DESC 
+                LIMIT 50`,
+          params: [],
+          explanation: "High priority emails to/from Rudy in last 14 days",
+          result_type: "list"
+        };
+      }
+    }
+    
+    // Recent emails for Rudy
+    if (lowerQuery.includes('rudy') && (lowerQuery.includes('recent') || lowerQuery.includes('email'))) {
+      return {
+        sql: `SELECT * FROM email_analytics 
+              WHERE (from_email ILIKE '%Rudy%' OR 'Rudy@CazarNYC.com' = ANY(to_emails) OR to_emails::text ILIKE '%Rudy%')
+              AND received_date >= NOW() - INTERVAL '7 days'
+              ORDER BY received_date DESC 
+              LIMIT 50`,
+        params: [],
+        explanation: "Recent emails to/from Rudy in last 7 days",
+        result_type: "list"
+      };
+    }
+    
+    // Fallback to Claude for complex queries
     const prompt = `You are an SQL expert for an email analytics system. Generate a PostgreSQL query based on this natural language request:
 
 User Query: "${userQuery}"
