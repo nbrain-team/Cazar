@@ -144,22 +144,22 @@ export const tools = [
   },
   {
     name: 'query_operations_db',
-    description: 'Query operations database for drivers, timecards, violations, hours worked, breaks, schedules. Use for: driver information, compliance checking, timecard analysis, violation tracking.',
+    description: 'Query operations database for drivers, timecards, violations, hours worked, breaks, schedules. Use for: driver information, compliance checking, timecard analysis, violation tracking, break compliance.',
     input_schema: {
       type: 'object',
       properties: {
         query_type: {
           type: 'string',
-          enum: ['drivers', 'timecards', 'violations', 'breaks', 'hos_status'],
-          description: 'Type of data to query'
+          enum: ['drivers', 'timecards', 'violations', 'break_violations', 'consecutive_days'],
+          description: 'Type of data to query. Use break_violations for lunch break compliance, consecutive_days for drivers working too many days in a row.'
         },
         driver_name: {
           type: 'string',
           description: 'Driver name to filter by'
         },
-        date_range: {
-          type: 'string',
-          description: 'Date range in format YYYY-MM-DD to YYYY-MM-DD'
+        days_back: {
+          type: 'number',
+          description: 'How many days back to search (default: 30)'
         },
         status: {
           type: 'string',
@@ -703,14 +703,14 @@ async function queryTeams(args) {
  * Query operations database (drivers, timecards, violations)
  */
 async function queryOperationsDB(args) {
-  const { query_type, driver_name, date_range, status, limit = 100 } = args;
+  const { query_type, driver_name, date_range, status, limit = 100, days_back = 30 } = args;
 
   let sql = '';
   let params = [];
 
   switch (query_type) {
     case 'drivers':
-      sql = `SELECT driver_id, driver_name, driver_status, employment_status, hire_date 
+      sql = `SELECT driver_id, driver_name, driver_status, employment_status, hire_date, department, job_title
              FROM drivers 
              WHERE driver_name ILIKE $1 OR driver_status = $2
              LIMIT $3`;
@@ -718,19 +718,124 @@ async function queryOperationsDB(args) {
       break;
 
     case 'timecards':
-      sql = `SELECT * FROM timecards WHERE date >= NOW() - INTERVAL '30 days' LIMIT $1`;
+      sql = `SELECT t.*, d.driver_name, d.driver_status
+             FROM timecards t
+             LEFT JOIN drivers d ON t.employee_id = d.driver_id
+             WHERE t.date >= NOW() - INTERVAL '${days_back} days' 
+             LIMIT $1`;
       params = [limit];
       break;
 
     case 'violations':
-      sql = `SELECT * FROM driver_violations WHERE occurred_at >= NOW() - INTERVAL '30 days' LIMIT $1`;
+      sql = `SELECT v.*, d.driver_name, d.driver_status
+             FROM driver_violations v
+             LEFT JOIN drivers d ON v.driver_id = d.driver_id
+             WHERE v.occurred_at >= NOW() - INTERVAL '${days_back} days' 
+             LIMIT $1`;
+      params = [limit];
+      break;
+
+    case 'break_violations':
+      // Query for drivers who worked 6+ hours without lunch break
+      sql = `
+        WITH daily_work AS (
+          SELECT 
+            s.driver_id,
+            d.driver_name,
+            DATE(s.start_utc) as work_date,
+            SUM(s.minutes) as total_minutes,
+            COUNT(DISTINCT DATE(s.start_utc)) as days_worked
+          FROM on_duty_segments s
+          LEFT JOIN drivers d ON s.driver_id = d.driver_id
+          WHERE s.start_utc >= NOW() - INTERVAL '${days_back} days'
+          GROUP BY s.driver_id, d.driver_name, DATE(s.start_utc)
+          HAVING SUM(s.minutes) >= 360
+        ),
+        lunch_breaks AS (
+          SELECT 
+            driver_id,
+            DATE(start_utc) as break_date,
+            COUNT(*) as break_count,
+            SUM(minutes) as break_minutes
+          FROM break_segments
+          WHERE label ILIKE '%lunch%'
+            AND start_utc >= NOW() - INTERVAL '${days_back} days'
+          GROUP BY driver_id, DATE(start_utc)
+        )
+        SELECT 
+          dw.driver_id,
+          dw.driver_name,
+          dw.work_date,
+          dw.total_minutes,
+          ROUND(dw.total_minutes / 60.0, 1) as hours_worked,
+          dw.days_worked,
+          COALESCE(lb.break_count, 0) as lunch_breaks_taken,
+          COALESCE(lb.break_minutes, 0) as lunch_break_minutes,
+          CASE 
+            WHEN COALESCE(lb.break_count, 0) = 0 THEN '❌ NO LUNCH'
+            WHEN COALESCE(lb.break_minutes, 0) < 30 THEN '⚠️ SHORT LUNCH'
+            ELSE '✅ OK'
+          END as lunch_status
+        FROM daily_work dw
+        LEFT JOIN lunch_breaks lb ON dw.driver_id = lb.driver_id AND dw.work_date = lb.break_date
+        WHERE COALESCE(lb.break_count, 0) = 0
+        ORDER BY dw.work_date DESC, dw.total_minutes DESC
+        LIMIT $1`;
+      params = [limit];
+      break;
+
+    case 'consecutive_days':
+      // Query for drivers working 6+ consecutive days
+      sql = `
+        WITH daily_work AS (
+          SELECT DISTINCT
+            s.driver_id,
+            d.driver_name,
+            DATE(s.start_utc) as work_date
+          FROM on_duty_segments s
+          LEFT JOIN drivers d ON s.driver_id = d.driver_id
+          WHERE s.start_utc >= NOW() - INTERVAL '${days_back} days'
+        ),
+        consecutive AS (
+          SELECT 
+            driver_id,
+            driver_name,
+            work_date,
+            work_date - (ROW_NUMBER() OVER (PARTITION BY driver_id ORDER BY work_date))::int as grp
+          FROM daily_work
+        ),
+        streaks AS (
+          SELECT 
+            driver_id,
+            driver_name,
+            MIN(work_date) as streak_start,
+            MAX(work_date) as streak_end,
+            COUNT(*) as consecutive_days
+          FROM consecutive
+          GROUP BY driver_id, driver_name, grp
+          HAVING COUNT(*) >= 6
+        )
+        SELECT 
+          driver_id,
+          driver_name,
+          streak_start,
+          streak_end,
+          consecutive_days,
+          CASE 
+            WHEN consecutive_days >= 7 THEN '🚨 CRITICAL'
+            WHEN consecutive_days >= 6 THEN '⚠️ WARNING'
+            ELSE '✅ OK'
+          END as status
+        FROM streaks
+        ORDER BY consecutive_days DESC, streak_end DESC
+        LIMIT $1`;
       params = [limit];
       break;
 
     default:
       return {
         success: false,
-        error: `Unknown query type: ${query_type}`
+        error: `Unknown query type: ${query_type}. Available: drivers, timecards, violations, break_violations, consecutive_days`
       };
   }
 
@@ -740,7 +845,8 @@ async function queryOperationsDB(args) {
     success: true,
     data: result.rows,
     count: result.rows.length,
-    query_summary: `Found ${result.rows.length} ${query_type} records`
+    query_summary: `Found ${result.rows.length} ${query_type} records`,
+    columns: result.fields?.map(f => f.name) || []
   };
 }
 
