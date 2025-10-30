@@ -2309,7 +2309,7 @@ import { generateCalendarQuery, formatCalendarResults, isCalendarQuery } from '.
 import { generateTeamsQuery, formatTeamsResults, isTeamsQuery } from './lib/claudeTeamsService.mjs';
 
 // Import Anthropic Sophisticated Agent (multi-step reasoning)
-import { runAnthropicAgent, formatAgentResponse } from './lib/anthropicSophisticatedAgent.mjs';
+import { runAnthropicAgent, formatAgentResponse as formatAnthropicResponse } from './lib/anthropicSophisticatedAgent.mjs';
 
 // POST /api/smart-agent/chat - Main Smart Agent endpoint (Now uses Anthropic Sophisticated Agent)
 app.post('/api/smart-agent/chat', async (req, res) => {
@@ -2331,7 +2331,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     );
     
     // Format response
-    const formattedResponse = formatAgentResponse(result);
+    const formattedResponse = formatAnthropicResponse(result);
     
     // Build sources from tool calls
     const sources = result.toolCalls?.map((call, index) => ({
@@ -2348,7 +2348,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       metadata: {
         steps: result.steps,
         toolsUsed: result.toolCalls?.length || 0,
-        model: ANTHROPIC_MODEL,
+        model: 'claude-3-5-haiku-20241022',
         mode: 'anthropic-sophisticated'
       }
     });
