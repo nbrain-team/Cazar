@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { Pinecone } from '@pinecone-database/pinecone';
 import pg from 'pg';
 import path from 'path';
@@ -18,6 +19,7 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Pinecone v3: no environment property; index is resolved by name
 const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 const pcIndexName = process.env.PINECONE_INDEX_NAME || 'nbrain';
