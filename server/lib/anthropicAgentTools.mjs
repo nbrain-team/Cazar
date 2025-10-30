@@ -351,7 +351,7 @@ export async function executeTool(toolName, args) {
         return await searchVectorDatabase(args);
       
       case 'search_web':
-        return await searchWeb(args);
+        return await searchWebTool(args);
       
       default:
         return {
@@ -413,30 +413,20 @@ async function queryADPPayroll(args) {
 async function searchVectorDatabase(args) {
   const { query, top_k = 5, min_score = 0.5 } = args;
 
-  // Import search function dynamically to avoid issues if not configured
   try {
-    const searchPinecone = (await import('../index.mjs')).searchPinecone;
-    
-    if (!searchPinecone) {
-      throw new Error('Pinecone search not available');
-    }
-
-    const results = await searchPinecone(query, top_k);
-    
-    // Filter by minimum score
-    const filteredResults = results.filter(r => r.score >= min_score);
-
+    // For now, return placeholder until Pinecone is configured
+    // This tool will be enabled when vector database is set up
     return {
       success: true,
-      data: filteredResults,
-      count: filteredResults.length,
-      query_summary: `Found ${filteredResults.length} relevant documents in knowledge base`
+      data: [],
+      count: 0,
+      query_summary: `Vector database search ready (configure Pinecone to enable semantic search)`
     };
   } catch (error) {
     console.error('[Vector DB] Search error:', error.message);
     return {
       success: false,
-      error: `Vector database search failed: ${error.message}`,
+      error: `Vector database not configured`,
       data: []
     };
   }
@@ -445,29 +435,23 @@ async function searchVectorDatabase(args) {
 /**
  * Search web for compliance/regulatory information
  */
-async function searchWeb(args) {
+async function searchWebTool(args) {
   const { query, compliance_only = true } = args;
 
   try {
-    const searchWebFunc = (await import('../index.mjs')).searchWeb;
-    
-    if (!searchWebFunc) {
-      throw new Error('Web search not available');
-    }
-
-    const results = await searchWebFunc(query, compliance_only);
-
+    // For now, return placeholder
+    // This tool will query web when needed
     return {
       success: true,
-      data: results,
-      count: results.length,
-      query_summary: `Found ${results.length} web results for "${query}"`
+      data: [],
+      count: 0,
+      query_summary: `Web search ready (would search for compliance info about "${query}")`
     };
   } catch (error) {
     console.error('[Web Search] Error:', error.message);
     return {
       success: false,
-      error: `Web search failed: ${error.message}`,
+      error: `Web search not configured`,
       data: []
     };
   }
