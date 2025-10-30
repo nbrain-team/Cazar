@@ -2319,19 +2319,31 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     
     console.log(`Smart Agent query: "${message}" with databases: [${enabledDatabases.join(', ')}]`);
     
-    // Run query type detection in parallel to save time
-    const [isEmailRelated, isCalendarRelated, isTeamsRelated] = await Promise.all([
-      isEmailQuery(message),
-      isCalendarQuery(message),
-      isTeamsQuery(message)
-    ]);
+    // Only run detection if databases aren't explicitly enabled (saves time)
+    let isEmailRelated = enabledDatabases.includes('email');
+    let isCalendarRelated = false;
+    let isTeamsRelated = false;
     
-    console.log(`[Smart Agent] Query type detection: email=${isEmailRelated}, calendar=${isCalendarRelated}, teams=${isTeamsRelated}`);
-    
-    // Auto-enable email search if AI detects it should be used
-    if (isEmailRelated && !enabledDatabases.includes('email')) {
-      console.log('[Smart Agent] Auto-enabling email search based on AI detection');
-      enabledDatabases.push('email');
+    // If email database is explicitly enabled, also check for calendar/Teams
+    if (enabledDatabases.includes('email')) {
+      // Run calendar and Teams detection in parallel (email already enabled, no need to detect)
+      [isCalendarRelated, isTeamsRelated] = await Promise.all([
+        isCalendarQuery(message),
+        isTeamsQuery(message)
+      ]);
+      console.log(`[Smart Agent] Email enabled. Additional detection: calendar=${isCalendarRelated}, teams=${isTeamsRelated}`);
+    } else {
+      // Only detect if email database should be auto-enabled
+      isEmailRelated = await isEmailQuery(message);
+      if (isEmailRelated) {
+        console.log('[Smart Agent] Auto-enabling email search based on AI detection');
+        enabledDatabases.push('email');
+        // Also check calendar/Teams
+        [isCalendarRelated, isTeamsRelated] = await Promise.all([
+          isCalendarQuery(message),
+          isTeamsQuery(message)
+        ]);
+      }
     }
     
     // Auto-enable PostgreSQL for queries about hours, timecards, workers, violations
