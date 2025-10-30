@@ -2601,7 +2601,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
       `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
     ).join('\n');
     
-    // Generate response using GPT-4 (with fallback if API issues)
+    // Generate response using Claude (Anthropic)
     let response;
     
     try {
@@ -2628,17 +2628,18 @@ ${contextSources.join('\n\n')}
 Previous conversation:
 ${conversationContext}`;
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o', // Using GPT-4o (latest model with vision, faster, cheaper)
-        temperature: 0.3,
-        max_tokens: 2000,
+      // Use Anthropic Claude instead of OpenAI
+      const completion = await anthropic.messages.create({
+        model: 'claude-3-opus-20240229',
+        max_tokens: 4096,
+        temperature: 0.7,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ]
       });
       
-      response = completion.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response.';
+      response = completion.content[0].text || 'I apologize, but I could not generate a response.';
       
     } catch (aiError) {
       console.error('Claude API error:', aiError.message);
