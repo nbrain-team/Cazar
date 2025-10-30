@@ -2308,8 +2308,63 @@ import { syncTeamsMessages } from './lib/teamsSyncService.mjs';
 import { generateCalendarQuery, formatCalendarResults, isCalendarQuery } from './lib/claudeCalendarService.mjs';
 import { generateTeamsQuery, formatTeamsResults, isTeamsQuery } from './lib/claudeTeamsService.mjs';
 
-// POST /api/smart-agent/chat - Main Smart Agent endpoint
+// Import Anthropic Sophisticated Agent (multi-step reasoning)
+import { runAnthropicAgent, formatAgentResponse } from './lib/anthropicSophisticatedAgent.mjs';
+
+// POST /api/smart-agent/chat - Main Smart Agent endpoint (Now uses Anthropic Sophisticated Agent)
 app.post('/api/smart-agent/chat', async (req, res) => {
+  try {
+    const { message, clientFilter, enabledDatabases = [], conversationHistory = [] } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'message_required' });
+    }
+    
+    console.log(`\n🤖 Smart Agent query: "${message}"`);
+    console.log(`   Databases enabled: [${enabledDatabases.join(', ')}]`);
+    
+    // Use Anthropic Sophisticated Agent for ALL queries (intelligent multi-step reasoning)
+    const result = await runAnthropicAgent(
+      message,
+      conversationHistory,
+      process.env.DATABASE_URL
+    );
+    
+    // Format response
+    const formattedResponse = formatAgentResponse(result);
+    
+    // Build sources from tool calls
+    const sources = result.toolCalls?.map((call, index) => ({
+      type: 'tool',
+      title: `${call.tool.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
+      snippet: call.result.query_summary || call.result.count || 'Executed'
+    })) || [];
+    
+    console.log(`✨ Completed in ${result.steps} steps using ${result.toolCalls?.length || 0} tools`);
+    
+    return res.json({
+      response: formattedResponse,
+      sources: sources.length > 0 ? sources : undefined,
+      metadata: {
+        steps: result.steps,
+        toolsUsed: result.toolCalls?.length || 0,
+        model: ANTHROPIC_MODEL,
+        mode: 'anthropic-sophisticated'
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Smart Agent error:', error);
+    res.status(500).json({ 
+      error: 'smart_agent_failed', 
+      detail: error.message 
+    });
+  }
+});
+
+// Fallback OLD Smart Agent endpoint (commented out - keeping for reference)
+/*
+app.post('/api/smart-agent/chat-old', async (req, res) => {
   try {
     const { message, clientFilter, enabledDatabases = [], conversationHistory = [] } = req.body;
     
@@ -2762,8 +2817,10 @@ ${conversationContext}`;
     });
   }
 });
+*/
+// End of OLD Smart Agent code
 
-// POST /api/smart-agent/advanced - Sophisticated Multi-Step Agent
+// POST /api/smart-agent/advanced - Sophisticated Multi-Step Agent (OLD - OpenAI based)
 app.post('/api/smart-agent/advanced', async (req, res) => {
   try {
     const { message, conversationHistory = [] } = req.body;
