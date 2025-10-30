@@ -183,15 +183,23 @@ Common Categories: Operations, Payroll, Fleet, HR, Uniform, PTO, Scheduling, Inc
 Request Types: PTO, Scheduling, Payroll, Uniform, Incident, Vehicle, Maintenance
 Status: pending, responded, escalated, closed, ignored
 
-Return JSON:
+You MUST return ONLY valid JSON with no extra text before or after. Format:
 {
   "sql": "SELECT ... (complete SQL query)",
-  "params": [array of parameters for $1, $2, etc.],
-  "explanation": "string (what the query does)",
-  "result_type": "list|count|summary|metric"
+  "params": [],
+  "explanation": "what the query does",
+  "result_type": "list"
 }
 
-Make queries efficient with proper WHERE clauses and LIMIT when appropriate.`;
+Example for "recent emails to Rudy":
+{
+  "sql": "SELECT * FROM email_analytics WHERE 'Rudy@CazarNYC.com' = ANY(to_emails) OR to_emails::text ILIKE '%Rudy%' ORDER BY received_date DESC LIMIT 50",
+  "params": [],
+  "explanation": "Recent emails sent to Rudy",
+  "result_type": "list"
+}
+
+Return ONLY the JSON object, no markdown, no explanation outside the JSON.`;
 
     const message = await anthropic.messages.create({
       model: CLAUDE_MODEL,

@@ -2360,34 +2360,60 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     // Handle email analytics queries with Claude
     if (isEmailRelated && enabledDatabases.includes('email')) {
       try {
-        console.log('[Smart Agent] Email query detected - using Claude 4.5 Email Analytics');
+        console.log('[Smart Agent] Email query detected - using Claude Email Analytics');
         
         // Generate and execute SQL query using Claude
         const { sql, params, explanation } = await generateEmailQuery(message);
         console.log(`[Smart Agent] Generated SQL: ${sql}`);
         
         const emailResults = await pool.query(sql, params || []);
+        console.log(`[Smart Agent] Database returned ${emailResults.rows.length} email results`);
         
-        // Format results using Claude with conversation history for follow-ups
-        const formattedResponse = await formatEmailQueryResults(emailResults.rows, message, conversationHistory);
-        
-        // Add to context
-        contextSources.push(`[Email Analytics] ${formattedResponse}`);
-        sources.push({
-          type: 'email',
-          title: 'Email Analytics Results',
-          snippet: `${emailResults.rows.length} results found`,
-          data: emailResults.rows,
-          explanation
-        });
-        
-        console.log(`[Smart Agent] Email Analytics: ${emailResults.rows.length} results`);
+        if (emailResults.rows.length > 0) {
+          // Format results using Claude with conversation history for follow-ups
+          try {
+            const formattedResponse = await formatEmailQueryResults(emailResults.rows, message, conversationHistory);
+            
+            // Add to context
+            contextSources.push(`[Email Analytics] ${formattedResponse}`);
+            sources.push({
+              type: 'email',
+              title: 'Email Analytics Results',
+              snippet: `${emailResults.rows.length} results found`,
+              data: emailResults.rows,
+              explanation
+            });
+            
+            console.log(`[Smart Agent] Email Analytics: ${emailResults.rows.length} results formatted successfully`);
+          } catch (formatError) {
+            // If formatting fails, add raw data summary to context
+            console.error('[Smart Agent] Formatting error, using raw data:', formatError.message);
+            
+            const rawSummary = `Found ${emailResults.rows.length} emails. Recent emails:\n` +
+              emailResults.rows.slice(0, 10).map((email, i) => 
+                `${i+1}. From: ${email.from_name} | Subject: ${email.subject} | Date: ${new Date(email.received_date).toLocaleDateString()} | Category: ${email.category || 'N/A'} | Priority: ${email.priority || 'N/A'}`
+              ).join('\n');
+            
+            contextSources.push(`[Email Analytics] ${rawSummary}`);
+            sources.push({
+              type: 'email',
+              title: 'Email Data (Raw)',
+              snippet: `${emailResults.rows.length} emails found`,
+              data: emailResults.rows
+            });
+          }
+        } else {
+          console.log('[Smart Agent] No email results found');
+          contextSources.push('[Email Analytics] No emails found matching the query criteria.');
+        }
         
       } catch (error) {
         console.error('[Smart Agent] Email Analytics error:', error.message);
+        console.error('[Smart Agent] Error type:', error.name);
         console.error('[Smart Agent] Full error stack:', error.stack);
-        contextSources.push(`[Email Analytics] Error occurred but email data unavailable. Error: ${error.message}`);
-        // Don't add error to sources - better to have no results than confusing error messages
+        
+        // Add minimal error message - don't expose technical details
+        contextSources.push(`[Email Analytics] Unable to retrieve email data at this time.`);
       }
     }
     
