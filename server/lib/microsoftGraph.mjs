@@ -59,7 +59,7 @@ async function getAccessToken() {
 }
 
 // Get Graph client
-async function getGraphClient() {
+export async function getGraphClient() {
   const token = await getAccessToken();
   
   return Client.init({

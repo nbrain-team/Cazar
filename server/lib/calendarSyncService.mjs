@@ -3,7 +3,8 @@
  * Syncs calendar events from Microsoft Graph to PostgreSQL with Claude analysis
  */
 
-import { getMailboxUsers, getGraphClient } from './microsoftGraph.mjs';
+import { getMailboxUsers } from './emailFetchService.mjs';
+import { getGraphClient } from './microsoftGraph.mjs';
 import { analyzeCalendarEvent } from './claudeCalendarService.mjs';
 import pg from 'pg';
 
