@@ -92,8 +92,18 @@ export async function runAnthropicAgent(userMessage, conversationHistory = [], d
   initializePool(databaseUrl);
   
   // Build conversation messages
+  // Filter out any tool use messages from conversation history (only keep user/assistant text)
+  const cleanHistory = conversationHistory.filter(msg => {
+    if (!msg.content) return false;
+    // Only keep messages with simple text content
+    if (typeof msg.content === 'string') return true;
+    // Skip tool result messages from history
+    if (Array.isArray(msg.content)) return false;
+    return true;
+  });
+  
   const messages = [
-    ...conversationHistory,
+    ...cleanHistory,
     { role: 'user', content: userMessage }
   ];
   
@@ -195,12 +205,30 @@ export async function runAnthropicAgent(userMessage, conversationHistory = [], d
           .map(block => block.text)
           .join('\n');
         
+        // Build clean conversation history for frontend (only user/assistant text exchanges)
+        const cleanConversationHistory = [];
+        for (let i = 0; i < messages.length; i++) {
+          const msg = messages[i];
+          // Skip tool result messages
+          if (msg.role === 'user' && Array.isArray(msg.content)) continue;
+          // Only keep text content
+          if (msg.role === 'user' && typeof msg.content === 'string') {
+            cleanConversationHistory.push({ role: 'user', content: msg.content });
+          } else if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+            // Extract text from assistant message
+            const textParts = msg.content.filter(block => block.type === 'text').map(block => block.text);
+            if (textParts.length > 0) {
+              cleanConversationHistory.push({ role: 'assistant', content: textParts.join('\n') });
+            }
+          }
+        }
+        
         return {
           answer: textContent,
           steps: stepCount,
           toolCalls,
           reasoning,
-          conversationHistory: messages
+          conversationHistory: cleanConversationHistory
         };
       }
       

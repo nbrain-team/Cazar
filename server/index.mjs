@@ -2350,7 +2350,8 @@ app.post('/api/smart-agent/chat', async (req, res) => {
         toolsUsed: result.toolCalls?.length || 0,
         model: 'claude-3-5-haiku-20241022',
         mode: 'anthropic-sophisticated'
-      }
+      },
+      conversationHistory: result.conversationHistory || []
     });
     
   } catch (error) {
