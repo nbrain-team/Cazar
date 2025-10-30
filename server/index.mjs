@@ -2317,7 +2317,7 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     const isEmailRelated = await isEmailQuery(message);
     
     // Auto-enable email search if AI detects it should be used
-    if (isEmailRelated && !enabledDatabases.includes('email') && !enabledDatabases.includes('microsoft')) {
+    if (isEmailRelated && !enabledDatabases.includes('email')) {
       console.log('[Smart Agent] Auto-enabling email search based on AI detection');
       enabledDatabases.push('email');
     }
@@ -2333,8 +2333,8 @@ app.post('/api/smart-agent/chat', async (req, res) => {
     const contextSources = [];
     const sources = [];
     
-    // Handle email analytics queries with Claude 4.5
-    if (isEmailRelated && (enabledDatabases.includes('email') || enabledDatabases.includes('microsoft'))) {
+    // Handle email analytics queries with Claude
+    if (isEmailRelated && enabledDatabases.includes('email')) {
       try {
         console.log('[Smart Agent] Email query detected - using Claude 4.5 Email Analytics');
         

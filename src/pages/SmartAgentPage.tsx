@@ -35,10 +35,10 @@ export default function SmartAgentPage() {
   const [showComplianceManager, setShowComplianceManager] = useState(false);
   const [databases, setDatabases] = useState<DatabaseSource[]>([
     { id: 'pinecone', name: 'Vector Knowledge Base', icon: <Database size={20} />, enabled: false, color: '#10b981' },
-    { id: 'microsoft', name: 'Microsoft 365', icon: <Mail size={20} />, enabled: true, color: '#0078d4' },
+    { id: 'email', name: 'Email Analytics', icon: <Mail size={20} />, enabled: true, color: '#0078d4' },
     { id: 'adp', name: 'ADP Payroll', icon: <DollarSign size={20} />, enabled: true, color: '#ef4444' },
     { id: 'web', name: 'Web Search', icon: <Globe size={20} />, enabled: false, color: '#f59e0b' },
-    { id: 'postgres', name: 'PostgreSQL', icon: <HardDrive size={20} />, enabled: true, color: '#3b82f6' },
+    { id: 'postgres', name: 'Operations Database', icon: <HardDrive size={20} />, enabled: true, color: '#3b82f6' },
   ]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
