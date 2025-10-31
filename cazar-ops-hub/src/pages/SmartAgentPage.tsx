@@ -92,7 +92,9 @@ export default function SmartAgentPage() {
       
       // Generate title from first user message
       const firstUserMsg = messages.find(m => m.role === 'user');
-      const title = firstUserMsg?.content.substring(0, 50) + (firstUserMsg?.content.length > 50 ? '...' : '') || 'New Chat';
+      const title = firstUserMsg?.content 
+        ? firstUserMsg.content.substring(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '')
+        : 'New Chat';
       
       // Update or add to chat histories
       setChatHistories(prev => {
