@@ -2363,6 +2363,54 @@ app.post('/api/smart-agent/chat', async (req, res) => {
   }
 });
 
+// POST /api/smart-agent/save-training-data - Save conversation for training
+app.post('/api/smart-agent/save-training-data', async (req, res) => {
+  try {
+    const { conversation, feedback, timestamp, databases } = req.body;
+    
+    console.log('[Training Data] Saving conversation with feedback');
+    
+    // Create training data object
+    const trainingData = {
+      timestamp: timestamp || new Date().toISOString(),
+      databases_used: databases || [],
+      feedback,
+      conversation: conversation.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp
+      })),
+      message_count: conversation.length
+    };
+    
+    // Append to training data file
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const trainingFilePath = path.join(__dirname, '../training_data.jsonl');
+    
+    // Append as JSONL (one JSON object per line)
+    const jsonLine = JSON.stringify(trainingData) + '\n';
+    fs.appendFileSync(trainingFilePath, jsonLine);
+    
+    console.log(`[Training Data] Saved conversation with ${conversation.length} messages`);
+    
+    res.json({
+      success: true,
+      message: 'Training data saved successfully'
+    });
+    
+  } catch (error) {
+    console.error('[Training Data] Save error:', error);
+    res.status(500).json({
+      error: 'save_failed',
+      message: error.message
+    });
+  }
+});
+
 // Fallback OLD Smart Agent endpoint (commented out - keeping for reference)
 /*
 app.post('/api/smart-agent/chat-old', async (req, res) => {

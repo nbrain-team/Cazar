@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Share2, Calendar, Layers, Loader2, Database, Mail, DollarSign, Globe, HardDrive, Settings } from 'lucide-react';
+import { Send, Share2, Calendar, Layers, Loader2, Database, Mail, DollarSign, Globe, HardDrive, Settings, Plus, History, X, MessageSquarePlus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ComplianceURLManager } from '../components/ComplianceURLManager';
@@ -27,12 +27,24 @@ interface DatabaseSource {
   color: string;
 }
 
+interface ChatHistory {
+  id: string;
+  title: string;
+  messages: Message[];
+  timestamp: Date;
+}
+
 export default function SmartAgentPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showDatabaseSelector, setShowDatabaseSelector] = useState(false);
   const [showComplianceManager, setShowComplianceManager] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [chatHistories, setChatHistories] = useState<ChatHistory[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [databases, setDatabases] = useState<DatabaseSource[]>([
     { id: 'pinecone', name: 'Vector Knowledge Base', icon: <Database size={20} />, enabled: false, color: '#10b981' },
     { id: 'email', name: 'Email Analytics', icon: <Mail size={20} />, enabled: true, color: '#0078d4' },
@@ -51,6 +63,105 @@ export default function SmartAgentPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load chat histories from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('chatHistories');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setChatHistories(parsed.map((h: any) => ({
+          ...h,
+          timestamp: new Date(h.timestamp),
+          messages: h.messages.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }))
+        })));
+      } catch (e) {
+        console.error('Error loading chat histories:', e);
+      }
+    }
+  }, []);
+
+  // Save current chat to history when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      const chatId = currentChatId || Date.now().toString();
+      if (!currentChatId) setCurrentChatId(chatId);
+      
+      // Generate title from first user message
+      const firstUserMsg = messages.find(m => m.role === 'user');
+      const title = firstUserMsg?.content.substring(0, 50) + (firstUserMsg?.content.length > 50 ? '...' : '') || 'New Chat';
+      
+      // Update or add to chat histories
+      setChatHistories(prev => {
+        const existing = prev.findIndex(h => h.id === chatId);
+        const chatHistory = {
+          id: chatId,
+          title,
+          messages,
+          timestamp: new Date()
+        };
+        
+        if (existing >= 0) {
+          const updated = [...prev];
+          updated[existing] = chatHistory;
+          localStorage.setItem('chatHistories', JSON.stringify(updated));
+          return updated;
+        } else {
+          const updated = [chatHistory, ...prev];
+          localStorage.setItem('chatHistories', JSON.stringify(updated));
+          return updated;
+        }
+      });
+    }
+  }, [messages, currentChatId]);
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentChatId(null);
+  };
+
+  const handleLoadChat = (chatHistory: ChatHistory) => {
+    setMessages(chatHistory.messages);
+    setCurrentChatId(chatHistory.id);
+    setShowChatHistory(false);
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    setChatHistories(prev => {
+      const updated = prev.filter(h => h.id !== chatId);
+      localStorage.setItem('chatHistories', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleSaveFeedback = async () => {
+    if (!feedbackComment.trim()) return;
+
+    try {
+      // Save conversation log with feedback to server
+      await fetch('/api/smart-agent/save-training-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation: messages,
+          feedback: feedbackComment,
+          timestamp: new Date().toISOString(),
+          databases: databases.filter(db => db.enabled).map(db => db.name)
+        })
+      });
+
+      setFeedbackComment('');
+      setShowFeedbackModal(false);
+      
+      // Show success message (could add a toast notification here)
+      console.log('Feedback saved successfully');
+    } catch (error) {
+      console.error('Error saving feedback:', error);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -137,34 +248,92 @@ export default function SmartAgentPage() {
             Ask questions and get answers from your internal knowledge base, powered by AI.
           </p>
         </div>
-        <button
-          onClick={() => setShowComplianceManager(true)}
-          style={{
-            padding: '0.5rem 1rem',
-            background: 'var(--gray-light)',
-            color: 'var(--text-primary)',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontWeight: 500,
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--primary-light)';
-            e.currentTarget.style.color = 'var(--primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'var(--gray-light)';
-            e.currentTarget.style.color = 'var(--text-primary)';
-          }}
-          title="Configure compliance URLs"
-        >
-          <Settings size={16} />
-          Compliance URLs
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            onClick={handleNewChat}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'var(--gray-light)',
+              color: 'var(--text-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--primary-light)';
+              e.currentTarget.style.color = 'var(--primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--gray-light)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            title="Start new chat"
+          >
+            <MessageSquarePlus size={16} />
+            New Chat
+          </button>
+          <button
+            onClick={() => setShowChatHistory(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'var(--gray-light)',
+              color: 'var(--text-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--primary-light)';
+              e.currentTarget.style.color = 'var(--primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--gray-light)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            title="View chat history"
+          >
+            <History size={16} />
+            History ({chatHistories.length})
+          </button>
+          <button
+            onClick={() => setShowComplianceManager(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'var(--gray-light)',
+              color: 'var(--text-primary)',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--primary-light)';
+              e.currentTarget.style.color = 'var(--primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--gray-light)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            title="Configure compliance URLs"
+          >
+            <Settings size={16} />
+            Settings
+          </button>
+        </div>
       </div>
 
       {/* Chat Container */}
@@ -343,6 +512,41 @@ export default function SmartAgentPage() {
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Feedback Button (for assistant messages only) */}
+                {message.role === 'assistant' && (
+                  <button
+                    onClick={() => setShowFeedbackModal(true)}
+                    style={{
+                      marginTop: '0.75rem',
+                      padding: '0.5rem 1rem',
+                      background: 'var(--gray-light)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                      color: 'var(--text-secondary)',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--primary-light)';
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                      e.currentTarget.style.color = 'var(--primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--gray-light)';
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }}
+                    title="Add feedback for training"
+                  >
+                    <Plus size={14} />
+                    Add Training Feedback
+                  </button>
                 )}
               </div>
             </div>
@@ -577,6 +781,218 @@ export default function SmartAgentPage() {
       {/* Compliance URL Manager */}
       {showComplianceManager && (
         <ComplianceURLManager onClose={() => setShowComplianceManager(false)} />
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }} onClick={() => setShowFeedbackModal(false)}>
+          <div style={{
+            background: 'var(--card-bg)',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '600px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Add Training Feedback
+              </h2>
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.95rem' }}>
+              This conversation will be saved for training the platform. Add your comments about response quality, missing information, or suggestions.
+            </p>
+
+            <textarea
+              value={feedbackComment}
+              onChange={(e) => setFeedbackComment(e.target.value)}
+              placeholder="Enter your feedback or comments about this conversation..."
+              style={{
+                width: '100%',
+                minHeight: '150px',
+                padding: '1rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                fontSize: '0.95rem',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                marginBottom: '1rem',
+              }}
+            />
+
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', padding: '0.75rem', background: 'var(--gray-light)', borderRadius: '6px' }}>
+              <strong>Conversation Summary:</strong>
+              <div style={{ marginTop: '0.5rem' }}>
+                <div>Messages: {messages.length}</div>
+                <div>Databases: {databases.filter(db => db.enabled).map(db => db.name).join(', ')}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'var(--gray-light)',
+                  color: 'var(--text-primary)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveFeedback}
+                disabled={!feedbackComment.trim()}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: feedbackComment.trim() ? 'var(--primary)' : 'var(--gray-light)',
+                  color: feedbackComment.trim() ? 'white' : 'var(--text-secondary)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: feedbackComment.trim() ? 'pointer' : 'not-allowed',
+                  fontWeight: 500,
+                }}
+              >
+                Save Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat History Modal */}
+      {showChatHistory && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }} onClick={() => setShowChatHistory(false)}>
+          <div style={{
+            background: 'var(--card-bg)',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '800px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Chat History
+              </h2>
+              <button
+                onClick={() => setShowChatHistory(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {chatHistories.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                No chat history yet. Start a conversation to see it here!
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {chatHistories.map((chat) => (
+                  <div
+                    key={chat.id}
+                    style={{
+                      padding: '1rem',
+                      background: chat.id === currentChatId ? 'var(--primary-light)' : 'var(--gray-light)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: `1px solid ${chat.id === currentChatId ? 'var(--primary)' : 'var(--border)'}`,
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (chat.id !== currentChatId) {
+                        e.currentTarget.style.background = 'var(--primary-light)';
+                        e.currentTarget.style.borderColor = 'var(--primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (chat.id !== currentChatId) {
+                        e.currentTarget.style.background = 'var(--gray-light)';
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }} onClick={() => handleLoadChat(chat)}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                          {chat.title}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {chat.messages.length} messages • {chat.timestamp.toLocaleDateString()} at {chat.timestamp.toLocaleTimeString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Delete this chat?')) {
+                            handleDeleteChat(chat.id);
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0.25rem',
+                          color: 'var(--text-secondary)',
+                        }}
+                        title="Delete chat"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

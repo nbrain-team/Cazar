@@ -38,3 +38,4 @@ build/
 payrolldata/
 mcp-teams-server-master/
 test_ms*.mjs
+training_data.jsonl
