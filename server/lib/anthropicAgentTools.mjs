@@ -25,7 +25,7 @@ export function initializePool(connectionString) {
 export const tools = [
   {
     name: 'query_emails',
-    description: 'Query email analytics database to find emails, requests, communications. Returns emails with Claude pre-analysis (categories, priorities, action items). Use for: email searches, priority identification, request tracking, communication analysis.',
+    description: 'Query email analytics database to find specific emails. Returns individual email records. Use ONLY when you need to see actual email details. For counts/statistics, use get_email_statistics instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -58,9 +58,40 @@ export const tools = [
         },
         limit: {
           type: 'number',
-          description: 'Maximum results to return (default: 50)'
+          description: 'Maximum results to return (default: 20, max: 50 to avoid token limits)'
         }
       }
+    }
+  },
+  {
+    name: 'get_email_statistics',
+    description: 'Get email counts, aggregations, and statistics. Use for: "count emails by category", "email volume by day", "statistics", "how many emails". Returns aggregated data only, not individual emails. Much faster than query_emails for counts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        group_by: {
+          type: 'string',
+          enum: ['category', 'day', 'category_and_day', 'person', 'priority', 'category_and_priority'],
+          description: 'How to group the statistics. category_and_day for daily breakdown by category.'
+        },
+        categories: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['Operations', 'Payroll', 'Fleet', 'HR', 'Uniform', 'PTO', 'Scheduling', 'Incident', 'General']
+          },
+          description: 'Optional: filter to specific categories'
+        },
+        person: {
+          type: 'string',
+          description: 'Optional: filter to emails for specific person'
+        },
+        days_back: {
+          type: 'number',
+          description: 'How many days back to analyze (default: 30)'
+        }
+      },
+      required: ['group_by']
     }
   },
   {
@@ -326,6 +357,9 @@ export async function executeTool(toolName, args) {
       case 'query_emails':
         return await queryEmails(args);
       
+      case 'get_email_statistics':
+        return await getEmailStatistics(args);
+      
       case 'query_calendar':
         return await queryCalendar(args);
       
@@ -458,7 +492,136 @@ async function searchWebTool(args) {
 }
 
 /**
- * Query emails with flexible filtering
+ * Get email statistics and aggregations
+ */
+async function getEmailStatistics(args) {
+  const {
+    group_by,
+    categories,
+    person,
+    days_back = 30
+  } = args;
+
+  let sql = '';
+  let params = [];
+  let paramIndex = 1;
+
+  // Build WHERE conditions
+  let conditions = [`received_date >= NOW() - INTERVAL '${days_back} days'`];
+  
+  if (person) {
+    const email = person.includes('@') ? person : `%${person}%`;
+    conditions.push(`(from_email ILIKE $${paramIndex} OR $${paramIndex+1} = ANY(to_emails))`);
+    params.push(email, person.includes('@') ? person : `${person}@CazarNYC.com`);
+    paramIndex += 2;
+  }
+  
+  if (categories && categories.length > 0) {
+    conditions.push(`category = ANY($${paramIndex}::text[])`);
+    params.push(categories);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  // Build appropriate aggregation SQL based on group_by
+  switch (group_by) {
+    case 'category':
+      sql = `
+        SELECT 
+          category,
+          COUNT(*) as email_count,
+          COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count,
+          COUNT(CASE WHEN requires_action = true THEN 1 END) as action_required_count
+        FROM email_analytics
+        WHERE ${whereClause}
+        GROUP BY category
+        ORDER BY email_count DESC`;
+      break;
+
+    case 'day':
+      sql = `
+        SELECT 
+          DATE(received_date) as date,
+          COUNT(*) as email_count,
+          COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count
+        FROM email_analytics
+        WHERE ${whereClause}
+        GROUP BY DATE(received_date)
+        ORDER BY date DESC`;
+      break;
+
+    case 'category_and_day':
+      sql = `
+        SELECT 
+          DATE(received_date) as date,
+          category,
+          COUNT(*) as email_count,
+          COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count
+        FROM email_analytics
+        WHERE ${whereClause}
+        GROUP BY DATE(received_date), category
+        ORDER BY date DESC, category`;
+      break;
+
+    case 'person':
+      sql = `
+        SELECT 
+          from_name,
+          from_email,
+          COUNT(*) as email_count,
+          MAX(received_date) as last_email
+        FROM email_analytics
+        WHERE ${whereClause}
+        GROUP BY from_name, from_email
+        ORDER BY email_count DESC
+        LIMIT 50`;
+      break;
+
+    case 'priority':
+      sql = `
+        SELECT 
+          priority,
+          COUNT(*) as email_count,
+          COUNT(CASE WHEN requires_action = true THEN 1 END) as action_required
+        FROM email_analytics
+        WHERE ${whereClause}
+        GROUP BY priority
+        ORDER BY email_count DESC`;
+      break;
+
+    case 'category_and_priority':
+      sql = `
+        SELECT 
+          category,
+          priority,
+          COUNT(*) as email_count
+        FROM email_analytics
+        WHERE ${whereClause}
+        GROUP BY category, priority
+        ORDER BY category, priority`;
+      break;
+
+    default:
+      return {
+        success: false,
+        error: `Unknown group_by: ${group_by}`
+      };
+  }
+
+  const result = await pool.query(sql, params);
+
+  return {
+    success: true,
+    data: result.rows,
+    count: result.rows.length,
+    query_summary: `Email statistics grouped by ${group_by}: ${result.rows.length} groups`,
+    aggregation_type: group_by
+  };
+}
+
+/**
+ * Query emails with flexible filtering (returns individual emails - use sparingly)
  */
 async function queryEmails(args) {
   const {
@@ -468,8 +631,11 @@ async function queryEmails(args) {
     urgency,
     days_back = 7,
     requires_action,
-    limit = 50
+    limit = 20  // Reduced default to avoid token limits
   } = args;
+  
+  // Cap limit to prevent token overflow
+  const safeLimit = Math.min(limit, 50);
 
   let conditions = [];
   let params = [];
@@ -518,7 +684,8 @@ async function queryEmails(args) {
 
   const sql = `
     SELECT 
-      message_id, from_name, from_email, to_emails, subject, body_preview,
+      message_id, from_name, from_email, subject, 
+      LEFT(body_preview, 200) as body_preview,
       received_date, category, request_type, priority, urgency,
       requires_action, action_items, status
     FROM email_analytics
@@ -527,7 +694,7 @@ async function queryEmails(args) {
     LIMIT $${paramIndex}
   `;
 
-  params.push(limit);
+  params.push(safeLimit);
 
   const result = await pool.query(sql, params);
 
@@ -535,7 +702,8 @@ async function queryEmails(args) {
     success: true,
     data: result.rows,
     count: result.rows.length,
-    query_summary: `Found ${result.rows.length} emails matching criteria`
+    query_summary: `Found ${result.rows.length} emails (limited to ${safeLimit} to avoid token overflow)`,
+    note: result.rows.length >= safeLimit ? `Results limited to ${safeLimit}. Use get_email_statistics for counts/aggregations.` : null
   };
 }
 
