@@ -95,15 +95,21 @@ export async function runAnthropicAgent(userMessage, conversationHistory = [], d
   initializePool(databaseUrl);
   
   // Build conversation messages
-  // Filter out any tool use messages from conversation history (only keep user/assistant text)
-  const cleanHistory = conversationHistory.filter(msg => {
-    if (!msg.content) return false;
-    // Only keep messages with simple text content
-    if (typeof msg.content === 'string') return true;
-    // Skip tool result messages from history
-    if (Array.isArray(msg.content)) return false;
-    return true;
-  });
+  // Filter and clean conversation history - remove extra fields that Anthropic doesn't accept
+  const cleanHistory = conversationHistory
+    .filter(msg => {
+      if (!msg.content) return false;
+      // Only keep messages with simple text content
+      if (typeof msg.content === 'string') return true;
+      // Skip tool result messages from history
+      if (Array.isArray(msg.content)) return false;
+      return true;
+    })
+    .map(msg => ({
+      role: msg.role,
+      content: msg.content
+      // Remove any extra fields like 'id', 'timestamp', etc. that frontend sends
+    }));
   
   const messages = [
     ...cleanHistory,
