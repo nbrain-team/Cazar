@@ -412,13 +412,17 @@ export const tools = [
   },
   {
     name: 'find_unanswered_emails',
-    description: 'Find emails older than specified hours without any response from internal team. Helps identify emails needing attention.',
+    description: 'Find emails older than specified hours without any response. Can search for external emails needing response OR internal emails (from specific person like Rudy) awaiting replies. Use for: finding neglected emails, tracking follow-ups.',
     input_schema: {
       type: 'object',
       properties: {
         hours_threshold: {
           type: 'number',
           description: 'Minimum hours old without response (default: 48)'
+        },
+        from_person: {
+          type: 'string',
+          description: 'Optional: Find emails FROM this person (e.g., "Rudy") that have not received replies. If omitted, searches for external emails needing response.'
         },
         categories: {
           type: 'array',
@@ -1506,11 +1510,28 @@ async function getEmailResponseStats(args) {
  * Find unanswered emails older than threshold
  */
 async function findUnansweredEmails(args) {
-  const { hours_threshold = 48, categories } = args;
+  const { hours_threshold = 48, from_person, categories } = args;
   
   let categoryFilter = '';
   if (categories && categories.length > 0) {
     categoryFilter = `AND category IN (${categories.map(c => `'${c}'`).join(',')})`;
+  }
+  
+  // Determine sender filter based on from_person parameter
+  let senderFilter = '';
+  let responseCheckCondition = '';
+  
+  if (from_person) {
+    // Looking for emails FROM a specific person (e.g., Rudy) that haven't received replies
+    const personEmail = from_person.includes('@') ? from_person : `%${from_person}%`;
+    senderFilter = `AND e.sender ILIKE '${personEmail}'`;
+    // Check for any response (not just from internal team)
+    responseCheckCondition = `r.received_at > e.received_at`;
+  } else {
+    // Looking for external emails that haven't been responded to by internal team
+    senderFilter = `AND e.sender NOT ILIKE '%@cazarnyc.com'`;
+    // Check for response from internal team
+    responseCheckCondition = `r.received_at > e.received_at AND r.sender ILIKE '%@cazarnyc.com'`;
   }
   
   const query = `
@@ -1529,12 +1550,11 @@ async function findUnansweredEmails(args) {
           SELECT COUNT(*)
           FROM emails r
           WHERE r.thread_id = e.thread_id
-            AND r.received_at > e.received_at
-            AND r.sender ILIKE '%@cazarnyc.com'
+            AND ${responseCheckCondition}
         ) as response_count
       FROM emails e
-      WHERE e.sender NOT ILIKE '%@cazarnyc.com'
-        AND e.received_at < CURRENT_TIMESTAMP - INTERVAL '${hours_threshold} hours'
+      WHERE e.received_at < CURRENT_TIMESTAMP - INTERVAL '${hours_threshold} hours'
+        ${senderFilter}
         ${categoryFilter}
     )
     SELECT 
@@ -1552,12 +1572,15 @@ async function findUnansweredEmails(args) {
   
   const result = await pool.query(query);
   
+  const searchType = from_person ? `emails from ${from_person}` : 'external emails';
+  
   return {
     success: true,
     threshold_hours: hours_threshold,
+    from_person: from_person || 'external senders',
     count: result.rows.length,
     unanswered_emails: result.rows,
-    message: `Found ${result.rows.length} emails older than ${hours_threshold} hours without response`,
+    message: `Found ${result.rows.length} ${searchType} older than ${hours_threshold} hours without response`,
     categories_filtered: categories || 'all'
   };
 }
