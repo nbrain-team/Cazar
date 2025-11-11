@@ -40,6 +40,19 @@ function cleanPEM(pem, type = 'CERTIFICATE') {
   return lines.join('\n');
 }
 
+function parseISODuration(duration) {
+  // Parse ISO 8601 duration format (e.g., "PT2H30M" = 2.5 hours)
+  if (!duration) return null;
+  
+  const match = duration.match(/PT(\d+H)?(\d+M)?/);
+  if (!match) return null;
+  
+  const hours = match[1] ? parseInt(match[1]) : 0;
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  
+  return hours + (minutes / 60);
+}
+
 function getADPCredentials() {
   const clientId = process.env.ADP_CLIENT_ID;
   const clientSecret = process.env.ADP_CLIENT_SECRET;
@@ -345,6 +358,16 @@ async function loadTimecardsToDatabase(workerTimecards, client) {
           const entryDate = dayEntry.entryDate;
           const timeEntries = dayEntry.timeEntries || [];
           
+          // Extract scheduled shift times if available
+          const scheduledShift = dayEntry.scheduledShift || {};
+          const scheduledStart = scheduledShift.scheduledStartDateTime ? DateTime.fromISO(scheduledShift.scheduledStartDateTime).toJSDate() : null;
+          const scheduledEnd = scheduledShift.scheduledEndDateTime ? DateTime.fromISO(scheduledShift.scheduledEndDateTime).toJSDate() : null;
+          
+          // Extract overtime hours from daily totals
+          const dailyTotals = dayEntry.dailyTotals || {};
+          const overtimeStr = dailyTotals.totalOvertimeHoursDuration; // Format: "PT2H30M"
+          const overtimeHours = overtimeStr ? parseISODuration(overtimeStr) : null;
+          
           // Process each time entry (punch in/out pair)
           for (let idx = 0; idx < timeEntries.length; idx++) {
             const timeEntry = timeEntries[idx];
@@ -362,6 +385,7 @@ async function loadTimecardsToDatabase(workerTimecards, client) {
               // Create unique ID for this timecard entry
               const timecardId = `${aoid}-${entryDate}-${idx}`;
               
+              // Enhanced INSERT with scheduled times and overtime
               const result = await client.query(
                 `INSERT INTO timecards (
                   timecard_id,
@@ -369,18 +393,24 @@ async function loadTimecardsToDatabase(workerTimecards, client) {
                   clock_in_time,
                   clock_out_time,
                   total_hours_worked,
+                  overtime_hours,
+                  scheduled_shift_start,
+                  scheduled_shift_end,
                   date,
                   created_at,
                   updated_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
                 ON CONFLICT (timecard_id)
                 DO UPDATE SET
                   clock_out_time = EXCLUDED.clock_out_time,
                   total_hours_worked = EXCLUDED.total_hours_worked,
+                  overtime_hours = EXCLUDED.overtime_hours,
+                  scheduled_shift_start = EXCLUDED.scheduled_shift_start,
+                  scheduled_shift_end = EXCLUDED.scheduled_shift_end,
                   updated_at = NOW()
                 RETURNING (xmax = 0) AS inserted`,
-                [timecardId, aoid, clockIn, clockOut, hoursWorked, entryDate]
+                [timecardId, aoid, clockIn, clockOut, hoursWorked, overtimeHours, scheduledStart, scheduledEnd, entryDate]
               );
               
               if (result.rows[0].inserted) {
@@ -389,7 +419,51 @@ async function loadTimecardsToDatabase(workerTimecards, client) {
                 updated++;
               }
               
-              console.log(`  ✅ ${name} - ${entryDate} (${hoursWorked.toFixed(2)} hrs)`);
+              // Process breaks for this time entry
+              const breaks = timeEntry.breaks || [];
+              for (const breakEntry of breaks) {
+                try {
+                  const breakStart = breakEntry.startPeriod?.startDateTime ? DateTime.fromISO(breakEntry.startPeriod.startDateTime).toJSDate() : null;
+                  const breakEnd = breakEntry.endPeriod?.endDateTime ? DateTime.fromISO(breakEntry.endPeriod.endDateTime).toJSDate() : null;
+                  
+                  if (breakStart && breakEnd) {
+                    const breakDuration = (breakEnd - breakStart) / (1000 * 60); // minutes
+                    
+                    await client.query(
+                      `INSERT INTO meal_breaks (
+                        timecard_id,
+                        employee_id,
+                        break_code,
+                        break_type,
+                        break_start,
+                        break_end,
+                        break_duration_minutes,
+                        is_paid,
+                        date
+                      )
+                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                      ON CONFLICT DO NOTHING`,
+                      [
+                        timecardId,
+                        aoid,
+                        breakEntry.breakCode?.codeValue || 'UNKNOWN',
+                        breakEntry.breakCode?.shortName || 'Break',
+                        breakStart,
+                        breakEnd,
+                        Math.round(breakDuration),
+                        breakEntry.paidIndicator || false,
+                        entryDate
+                      ]
+                    );
+                  }
+                } catch (breakErr) {
+                  console.log(`    ⚠️  Skipping break: ${breakErr.message}`);
+                }
+              }
+              
+              const otDisplay = overtimeHours ? ` OT:${overtimeHours.toFixed(1)}` : '';
+              const schedDisplay = scheduledStart ? ' (scheduled)' : '';
+              console.log(`  ✅ ${name} - ${entryDate} (${hoursWorked.toFixed(2)} hrs${otDisplay})${schedDisplay}`);
             }
           }
         }

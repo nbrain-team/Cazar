@@ -42,6 +42,14 @@ const SYSTEM_PROMPT = `You are a sophisticated AI operations analyst for Cazar L
 - **analyze_priorities**: Synthesize priorities across all sources for a person
 - **compare_time_periods**: Compare metrics between time periods
 - **extract_action_items**: Find all action items from communications
+- **analyze_driver_requests**: Track driver requests (PTO, payroll, scheduling, uniforms) and response times
+- **get_email_response_stats**: Email response statistics by responder and category
+- **find_unanswered_emails**: Find emails older than X hours without response
+- **find_incident_attachments**: Find incident emails with attachments
+
+### Timecard & Compliance Tools:
+- **check_missing_clockouts**: Find shifts with missing clock-out times
+- **check_weekly_overtime**: Find employees exceeding hours threshold (default 40) before Saturday
 
 ## How to Approach Questions:
 
