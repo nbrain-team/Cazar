@@ -2411,6 +2411,45 @@ app.post('/api/smart-agent/save-training-data', async (req, res) => {
   }
 });
 
+// GET /api/smart-agent/training-data - View all feedback (for admin use)
+app.get('/api/smart-agent/training-data', async (req, res) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const trainingFilePath = path.join(__dirname, '../training_data.jsonl');
+    
+    // Check if file exists
+    if (!fs.existsSync(trainingFilePath)) {
+      return res.json({
+        count: 0,
+        feedbacks: [],
+        message: 'No feedback data yet'
+      });
+    }
+    
+    // Read file and parse JSONL
+    const fileContent = fs.readFileSync(trainingFilePath, 'utf-8');
+    const lines = fileContent.trim().split('\n').filter(line => line.length > 0);
+    const feedbacks = lines.map(line => JSON.parse(line));
+    
+    res.json({
+      count: feedbacks.length,
+      feedbacks: feedbacks,
+      latest: feedbacks[feedbacks.length - 1]
+    });
+    
+  } catch (error) {
+    console.error('[Training Data] Read error:', error);
+    res.status(500).json({
+      error: 'read_failed',
+      message: error.message
+    });
+  }
+});
+
 // Fallback OLD Smart Agent endpoint (commented out - keeping for reference)
 /*
 app.post('/api/smart-agent/chat-old', async (req, res) => {
