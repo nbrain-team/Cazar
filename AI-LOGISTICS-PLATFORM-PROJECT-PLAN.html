@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Amazon Logistics Platform - 6-Month Project Plan</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #1e3a8a;
+            --primary-dark: #1e293b;
+            --primary-light: #e0e7ff;
+            --accent: #0f172a;
+            --success: #065f46;
+            --warning: #92400e;
+            --danger: #991b1b;
+            --text-dark: #0f172a;
+            --text-light: #475569;
+            --bg-gray: #f8fafc;
+            --border: #cbd5e1;
+        }
+
+        .icon-silhouette {
+            width: 24px;
+            height: 24px;
+            background: currentColor;
+            mask-size: contain;
+            mask-repeat: no-repeat;
+            mask-position: center;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .icon-target { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z'/%3E%3Cpath d='M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z'/%3E%3C/svg%3E"); }
+        
+        .icon-code { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z'/%3E%3C/svg%3E"); }
+        
+        .icon-users { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z'/%3E%3C/svg%3E"); }
+        
+        .icon-calendar { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z'/%3E%3C/svg%3E"); }
+        
+        .icon-check { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E"); }
+        
+        .icon-alert { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/%3E%3C/svg%3E"); }
+        
+        .icon-doc { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z'/%3E%3C/svg%3E"); }
+        
+        .icon-clock { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z'/%3E%3Cpath d='M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z'/%3E%3C/svg%3E"); }
+        
+        .icon-settings { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E"); }
+        
+        .icon-brain { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M13 3C9.23 3 6.19 5.95 6 9.66l-1.92.58C2.61 10.79 1.5 12.3 1.5 14c0 2.21 1.79 4 4 4h.68C7.66 20.71 10.16 23 13 23c3.31 0 6-2.69 6-6V9c0-3.31-2.69-6-6-6zm1 14c0 .55-.45 1-1 1s-1-.45-1-1v-1h2v1zm-2-3V7h2v7h-2zm5 0h-1V7h1v7z'/%3E%3C/svg%3E"); }
+        
+        .icon-network { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm15 0h-2v3h-3v2h3v3h2v-3h3v-2h-3z'/%3E%3C/svg%3E"); }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background: var(--bg-gray);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+            color: white;
+            padding: 48px 0;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        .header-subtitle {
+            font-size: 20px;
+            opacity: 0.95;
+        }
+
+        .project-overview {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .overview-card {
+            background: white;
+            padding: 28px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 4px solid var(--primary);
+        }
+
+        .overview-label {
+            font-size: 13px;
+            color: var(--text-light);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .overview-value {
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .overview-desc {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-top: 8px;
+        }
+
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .section-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 24px;
+            color: var(--text-dark);
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .team-card {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .team-card h3 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .team-member {
+            display: flex;
+            align-items: start;
+            gap: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: var(--bg-gray);
+            border-radius: 8px;
+        }
+
+        .member-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .member-info h4 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .member-role {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 8px;
+        }
+
+        .member-tasks {
+            font-size: 13px;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        .sprint-container {
+            margin-bottom: 48px;
+        }
+
+        .sprint-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 28px 32px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sprint-title {
+            font-size: 26px;
+            font-weight: 800;
+        }
+
+        .sprint-dates {
+            font-size: 16px;
+            opacity: 0.95;
+            font-weight: 600;
+        }
+
+        .sprint-content {
+            background: white;
+            padding: 0;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .sprint-section {
+            padding: 32px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .sprint-section:last-child {
+            border-bottom: none;
+        }
+
+        .sprint-section h4 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--primary-light);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .task-list {
+            list-style: none;
+        }
+
+        .task-list li {
+            padding: 12px 0 12px 32px;
+            position: relative;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-dark);
+        }
+
+        .task-list li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .deliverable-list {
+            display: grid;
+            gap: 16px;
+        }
+
+        .deliverable-item {
+            background: var(--bg-gray);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--success);
+        }
+
+        .deliverable-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .deliverable-desc {
+            font-size: 14px;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        .milestone {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .milestone-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .milestone-text {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .phase-divider {
+            background: linear-gradient(135deg, var(--accent) 0%, #ea580c 100%);
+            color: white;
+            padding: 32px;
+            border-radius: 16px;
+            margin: 60px 0;
+            text-align: center;
+        }
+
+        .phase-divider h2 {
+            font-size: 36px;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        .phase-divider p {
+            font-size: 18px;
+            opacity: 0.95;
+        }
+
+        .requirements-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .requirement-card {
+            background: #fff3cd;
+            border: 2px solid var(--warning);
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        .requirement-card h5 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .requirement-card p {
+            font-size: 13px;
+            color: var(--text-light);
+            line-height: 1.5;
+        }
+
+        .critical-path {
+            background: #fee2e2;
+            border: 2px solid var(--danger);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .critical-path h5 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--danger);
+            margin-bottom: 12px;
+        }
+
+        .critical-path ul {
+            list-style: none;
+        }
+
+        .critical-path li {
+            padding: 8px 0;
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+
+        .critical-path li::before {
+            content: '! ';
+            margin-right: 8px;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+            .sprint-container {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="container">
+            <h1>AI Amazon Logistics Platform</h1>
+            <p class="header-subtitle">6-Month Sprint-Based Implementation Plan • Day 1 to Launch</p>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- PLATFORM ARCHITECTURE -->
+        <div class="section">
+            <h2 class="section-title">Platform Architecture & Intelligence Infrastructure</h2>
+            
+            <div style="background: white; padding: 48px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); margin-bottom: 32px;">
+                <h3 style="font-size: 28px; font-weight: 800; margin-bottom: 32px; color: var(--primary);">
+                    <span class="icon-silhouette icon-brain" style="width: 32px; height: 32px; margin-right: 12px;"></span>
+                    Coherent AI Agent Architecture
+                </h3>
+                
+                <p style="font-size: 16px; line-height: 1.8; color: var(--text-dark); margin-bottom: 32px;">
+                    The platform is built on a <strong>coherent agent architecture</strong> where a centralized AI brain coordinates 
+                    all modules, data sources, and decision-making. Unlike traditional software with disconnected features, our system 
+                    maintains unified context across all operations, enabling predictive intelligence and autonomous action.
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-bottom: 48px;">
+                    <div style="background: var(--bg-gray); padding: 28px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--primary);">
+                            <span class="icon-silhouette icon-settings" style="margin-right: 8px;"></span>
+                            Core Intelligence Layer
+                        </h4>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 8px;">• Claude 4 Sonnet for complex analysis</li>
+                            <li style="margin-bottom: 8px;">• GPT-4 for natural language tasks</li>
+                            <li style="margin-bottom: 8px;">• Gemini for cost optimization</li>
+                            <li style="margin-bottom: 8px;">• Multi-modal LLM routing engine</li>
+                            <li style="margin-bottom: 8px;">• Reinforcement learning feedback loops</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 28px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--primary);">
+                            <span class="icon-silhouette icon-network" style="margin-right: 8px;"></span>
+                            MCP + RAG Retrieval
+                        </h4>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 8px;">• Model Context Protocol integration</li>
+                            <li style="margin-bottom: 8px;">• Vector database (Pinecone) for knowledge</li>
+                            <li style="margin-bottom: 8px;">• RAG retrieval for accurate responses</li>
+                            <li style="margin-bottom: 8px;">• Semantic search across all data</li>
+                            <li style="margin-bottom: 8px;">• Contextual memory persistence</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 28px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--primary);">
+                            <span class="icon-silhouette icon-code" style="margin-right: 8px;"></span>
+                            Real-Time Data Pipelines
+                        </h4>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 8px;">• WebSocket connections for live updates</li>
+                            <li style="margin-bottom: 8px;">• Event-driven architecture</li>
+                            <li style="margin-bottom: 8px;">• Webhook listeners for all APIs</li>
+                            <li style="margin-bottom: 8px;">• Stream processing (Apache Kafka)</li>
+                            <li style="margin-bottom: 8px;">• Sub-second alert delivery</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%); color: white; padding: 40px; border-radius: 12px; margin-bottom: 32px;">
+                    <h4 style="font-size: 20px; font-weight: 700; margin-bottom: 24px;">How the Coherent Agent Works:</h4>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; font-size: 14px;">
+                        <div style="text-align: center;">
+                            <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="font-size: 32px; font-weight: 900; margin-bottom: 4px;">1</div>
+                                <div style="font-size: 12px; opacity: 0.9;">DATA INGESTION</div>
+                            </div>
+                            <p style="line-height: 1.6; opacity: 0.95;">All data sources stream into unified knowledge base via API integrations</p>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="font-size: 32px; font-weight: 900; margin-bottom: 4px;">2</div>
+                                <div style="font-size: 12px; opacity: 0.9;">CONTEXT BUILDING</div>
+                            </div>
+                            <p style="line-height: 1.6; opacity: 0.95;">AI maintains complete operational context across all modules simultaneously</p>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="font-size: 32px; font-weight: 900; margin-bottom: 4px;">3</div>
+                                <div style="font-size: 12px; opacity: 0.9;">INTELLIGENT ANALYSIS</div>
+                            </div>
+                            <p style="line-height: 1.6; opacity: 0.95;">Pattern recognition, prediction, and decision-making using multi-modal LLMs</p>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; margin-bottom: 12px;">
+                                <div style="font-size: 32px; font-weight: 900; margin-bottom: 4px;">4</div>
+                                <div style="font-size: 12px; opacity: 0.9;">AUTONOMOUS ACTION</div>
+                            </div>
+                            <p style="line-height: 1.6; opacity: 0.95;">Automated responses, alerts, corrections, and optimizations in real-time</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE ARCHITECTURE -->
+            <div style="background: white; padding: 48px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); margin-bottom: 32px;">
+                <h3 style="font-size: 28px; font-weight: 800; margin-bottom: 32px; color: var(--primary);">
+                    8-Module Integrated System
+                </h3>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">1</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Compliance Command Center</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Breach Prevention Engine</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Rolling 60-hour / 7-day violation calculator</li>
+                            <li style="margin-bottom: 6px;">• Meal break ADP-to-Flex automation</li>
+                            <li style="margin-bottom: 6px;">• Real-time compliance alerts (SMS/Teams)</li>
+                            <li style="margin-bottom: 6px;">• Predictive violation warnings (2-3 days ahead)</li>
+                            <li style="margin-bottom: 6px;">• Breach risk scoring dashboard</li>
+                            <li style="margin-bottom: 6px;">• 10-hour rest period enforcement</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">2</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Revenue Recovery Engine</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Payment Maximization</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Multi-window invoice reconciliation</li>
+                            <li style="margin-bottom: 6px;">• Automated dispute generation (Chime)</li>
+                            <li style="margin-bottom: 6px;">• Scorecard bonus optimization predictor</li>
+                            <li style="margin-bottom: 6px;">• Flex vs rescue classification (ML)</li>
+                            <li style="margin-bottom: 6px;">• Non-revenue driver detection</li>
+                            <li style="margin-bottom: 6px;">• Payment tracking & credit verification</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">3</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Payroll Automation Suite</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Time Card Intelligence</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• One-click payroll compliance audit</li>
+                            <li style="margin-bottom: 6px;">• Automated time card correction workflow</li>
+                            <li style="margin-bottom: 6px;">• Schedule-to-ADP auto-sync</li>
+                            <li style="margin-bottom: 6px;">• Efficiency bonus calculator</li>
+                            <li style="margin-bottom: 6px;">• Red/yellow/green gamification UI</li>
+                            <li style="margin-bottom: 6px;">• Historical pattern learning</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">4</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Intelligent Scheduling</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Predictive Staffing</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Smart standby recommendations</li>
+                            <li style="margin-bottom: 6px;">• Compliance pre-check before scheduling</li>
+                            <li style="margin-bottom: 6px;">• 6th consecutive day blocking system</li>
+                            <li style="margin-bottom: 6px;">• Predictive peak season staffing</li>
+                            <li style="margin-bottom: 6px;">• Driver availability optimization</li>
+                            <li style="margin-bottom: 6px;">• Rest time conflict prevention</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">5</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Amazon Portal Intelligence</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Communication Automation</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Work Summary Tool auto-reconciliation</li>
+                            <li style="margin-bottom: 6px;">• Communication monitoring & auto-response</li>
+                            <li style="margin-bottom: 6px;">• CAP/breach dispute generator</li>
+                            <li style="margin-bottom: 6px;">• Route code deconfliction</li>
+                            <li style="margin-bottom: 6px;">• 2-day lag tracking automation</li>
+                            <li style="margin-bottom: 6px;">• Flex vs rescue classification</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">6</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Smart Agent Chat</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Natural Language Interface</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Query any data across all systems</li>
+                            <li style="margin-bottom: 6px;">• Plain English questions, instant answers</li>
+                            <li style="margin-bottom: 6px;">• Multi-modal LLM routing (Claude + GPT)</li>
+                            <li style="margin-bottom: 6px;">• Training feedback loop</li>
+                            <li style="margin-bottom: 6px;">• Meeting insights & action tracking</li>
+                            <li style="margin-bottom: 6px;">• Continuous improvement via learning</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">7</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Financial Reconciliation</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">QuickBooks Integration</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Payroll-to-revenue % tracking</li>
+                            <li style="margin-bottom: 6px;">• Non-revenue cost identification</li>
+                            <li style="margin-bottom: 6px;">• Vendor performance benchmarking</li>
+                            <li style="margin-bottom: 6px;">• QuickBooks Online integration</li>
+                            <li style="margin-bottom: 6px;">• Real-time labor cost dashboard</li>
+                            <li style="margin-bottom: 6px;">• Station-level P&L analysis</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: var(--bg-gray); padding: 32px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                            <div style="width: 48px; height: 48px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 900;">8</div>
+                            <div>
+                                <h4 style="font-size: 18px; font-weight: 700; color: var(--text-dark);">Safety & Incident Intelligence</h4>
+                                <p style="font-size: 13px; color: var(--text-light);">Netradyne Integration</p>
+                            </div>
+                        </div>
+                        <ul style="list-style: none; padding: 0; font-size: 14px; line-height: 1.8; color: var(--text-light);">
+                            <li style="margin-bottom: 6px;">• Netradyne violation pattern analysis</li>
+                            <li style="margin-bottom: 6px;">• Auto-incident creation for trends</li>
+                            <li style="margin-bottom: 6px;">• Safety coaching prioritization</li>
+                            <li style="margin-bottom: 6px;">• Scorecard safety metric optimization</li>
+                            <li style="margin-bottom: 6px;">• Driver behavior profiling</li>
+                            <li style="margin-bottom: 6px;">• Video clip correlation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DATA INFRASTRUCTURE -->
+            <div style="background: white; padding: 48px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); margin-bottom: 32px;">
+                <h3 style="font-size: 28px; font-weight: 800; margin-bottom: 32px; color: var(--primary);">
+                    <span class="icon-silhouette icon-network" style="width: 32px; height: 32px; margin-right: 12px;"></span>
+                    Data Infrastructure & Integration Architecture
+                </h3>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px;">
+                    <div>
+                        <h4 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--primary);">
+                            Core Technology Stack
+                        </h4>
+                        <div style="background: var(--bg-gray); padding: 24px; border-radius: 8px; margin-bottom: 16px;">
+                            <h5 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Frontend Layer</h5>
+                            <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--text-light); line-height: 1.8;">
+                                <li>• React 18 + TypeScript</li>
+                                <li>• Redux Toolkit for state management</li>
+                                <li>• TailwindCSS for styling</li>
+                                <li>• Real-time WebSocket connections</li>
+                                <li>• Progressive Web App (PWA) support</li>
+                            </ul>
+                        </div>
+                        <div style="background: var(--bg-gray); padding: 24px; border-radius: 8px; margin-bottom: 16px;">
+                            <h5 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Backend Layer</h5>
+                            <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--text-light); line-height: 1.8;">
+                                <li>• Node.js + Express.js API</li>
+                                <li>• GraphQL & REST endpoints</li>
+                                <li>• PostgreSQL (operational data)</li>
+                                <li>• Redis (caching & sessions)</li>
+                                <li>• Background job processing (Bull)</li>
+                            </ul>
+                        </div>
+                        <div style="background: var(--bg-gray); padding: 24px; border-radius: 8px;">
+                            <h5 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">AI/ML Infrastructure</h5>
+                            <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--text-light); line-height: 1.8;">
+                                <li>• Pinecone vector database</li>
+                                <li>• LangChain orchestration</li>
+                                <li>• Custom embedding pipelines</li>
+                                <li>• Model monitoring & A/B testing</li>
+                                <li>• Reinforcement learning loops</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--primary);">
+                            External API Integrations
+                        </h4>
+                        <div style="background: var(--bg-gray); padding: 24px; border-radius: 8px; margin-bottom: 16px;">
+                            <h5 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Amazon Logistics Ecosystem</h5>
+                            <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--text-light); line-height: 1.8;">
+                                <li>• Amazon Logistics API (routes, scorecards, invoices)</li>
+                                <li>• Amazon Flex app integration</li>
+                                <li>• Chime messaging API</li>
+                                <li>• Work Summary Tool data extraction</li>
+                            </ul>
+                        </div>
+                        <div style="background: var(--bg-gray); padding: 24px; border-radius: 8px; margin-bottom: 16px;">
+                            <h5 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Workforce & Financial Systems</h5>
+                            <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--text-light); line-height: 1.8;">
+                                <li>• ADP Workforce Now API</li>
+                                <li>• Microsoft Graph API (365 suite)</li>
+                                <li>• QuickBooks Online API</li>
+                                <li>• Read.AI meeting intelligence</li>
+                            </ul>
+                        </div>
+                        <div style="background: var(--bg-gray); padding: 24px; border-radius: 8px;">
+                            <h5 style="font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Safety & Operations</h5>
+                            <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--text-light); line-height: 1.8;">
+                                <li>• Netradyne safety camera API</li>
+                                <li>• Twilio (SMS/voice alerts)</li>
+                                <li>• Microsoft Teams webhooks</li>
+                                <li>• Custom scheduling integrations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 32px; padding: 28px; background: linear-gradient(to right, var(--primary-dark), var(--primary)); color: white; border-radius: 12px;">
+                    <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">Security & Compliance Infrastructure</h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; font-size: 14px;">
+                        <div>
+                            <strong style="display: block; margin-bottom: 8px; opacity: 0.9;">Data Encryption</strong>
+                            <ul style="list-style: none; padding: 0; line-height: 1.8; opacity: 0.9;">
+                                <li>• AES-256 encryption at rest</li>
+                                <li>• TLS 1.3 for all data in transit</li>
+                                <li>• Encrypted backup storage</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong style="display: block; margin-bottom: 8px; opacity: 0.9;">Access Control</strong>
+                            <ul style="list-style: none; padding: 0; line-height: 1.8; opacity: 0.9;">
+                                <li>• Role-based permissions (RBAC)</li>
+                                <li>• Multi-factor authentication</li>
+                                <li>• Audit logging for all actions</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong style="display: block; margin-bottom: 8px; opacity: 0.9;">Compliance</strong>
+                            <ul style="list-style: none; padding: 0; line-height: 1.8; opacity: 0.9;">
+                                <li>• SOC 2 Type II ready</li>
+                                <li>• GDPR compliant architecture</li>
+                                <li>• Regular security audits</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROJECT OVERVIEW -->
+        <div class="project-overview">
+            <div class="overview-card">
+                <div class="overview-label">Timeline</div>
+                <div class="overview-value">24 Weeks</div>
+                <div class="overview-desc">6 months • 6 phases • 24 detailed sprints</div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-label">Modules</div>
+                <div class="overview-value">8 Total</div>
+                <div class="overview-desc">Compliance • Revenue • Payroll • Safety • AI</div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-label">Team Size</div>
+                <div class="overview-value">8-12</div>
+                <div class="overview-desc">Combined client + development teams</div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-label">Launch Date</div>
+                <div class="overview-value">Week 24</div>
+                <div class="overview-desc">Full production deployment ready</div>
+            </div>
+        </div>
+
+        <!-- TEAM STRUCTURE -->
+        <div class="section">
+            <h2 class="section-title">Team Structure</h2>
+            
+            <div class="team-grid">
+                <!-- Development Team -->
+                <div class="team-card">
+                    <h3><span class="icon-silhouette icon-code" style="width: 24px; height: 24px; margin-right: 8px;"></span>Our Development Team</h3>
+                    
+                    <div class="team-member">
+                        <div class="member-icon">👨‍💻</div>
+                        <div class="member-info">
+                            <h4>Lead AI Developer</h4>
+                            <div class="member-role">Danny • Full-time</div>
+                            <div class="member-tasks">
+                                Architecture design, AI/ML implementation, coherent agent development, MCP integration, quality assurance
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">🔌</div>
+                        <div class="member-info">
+                            <h4>API Integration Specialist</h4>
+                            <div class="member-role">Patrick/Sarjeel • Full-time</div>
+                            <div class="member-tasks">
+                                ADP API, Amazon Portal API, Microsoft Graph, Netradyne, QuickBooks, Read.AI integrations
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">🎨</div>
+                        <div class="member-info">
+                            <h4>UI/UX Designer</h4>
+                            <div class="member-role">Part-time</div>
+                            <div class="member-tasks">
+                                Dashboard design, mobile optimization, user experience flows, branding consistency
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">🧪</div>
+                        <div class="member-info">
+                            <h4>QA & Testing Engineer</h4>
+                            <div class="member-role">Part-time, starts Week 8</div>
+                            <div class="member-tasks">
+                                End-to-end testing, compliance validation, security testing, performance optimization
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">📚</div>
+                        <div class="member-info">
+                            <h4>Technical Writer</h4>
+                            <div class="member-role">Part-time, starts Week 16</div>
+                            <div class="member-tasks">
+                                User documentation, training materials, API documentation, video tutorials
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Client Team -->
+                <div class="team-card">
+                    <h3><span class="icon-silhouette icon-users" style="width: 24px; height: 24px; margin-right: 8px;"></span>Required Client Team</h3>
+                    
+                    <div class="team-member">
+                        <div class="member-icon">👔</div>
+                        <div class="member-info">
+                            <h4>DSP Owner / Decision Maker</h4>
+                            <div class="member-role">Throughout project</div>
+                            <div class="member-tasks">
+                                Strategic decisions, budget approvals, vision alignment, stakeholder communication, final signoffs
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">💼</div>
+                        <div class="member-info">
+                            <h4>CFO / Finance Lead</h4>
+                            <div class="member-role">Throughout project, heavy Weeks 9-16</div>
+                            <div class="member-tasks">
+                                Payroll process validation, reconciliation logic, financial integration, QuickBooks data access
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">📊</div>
+                        <div class="member-info">
+                            <h4>Operations Manager</h4>
+                            <div class="member-role">Throughout project</div>
+                            <div class="member-tasks">
+                                Daily workflow validation, compliance rules verification, real-world testing, user acceptance
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon">🔐</div>
+                        <div class="member-info">
+                            <h4>IT/Systems Administrator</h4>
+                            <div class="member-role">Throughout project</div>
+                            <div class="member-tasks">
+                                API credentials, system access, security approvals, data permissions, integration testing
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="team-member">
+                        <div class="member-icon"><span class="icon-silhouette icon-target" style="width: 28px; height: 28px;"></span></div>
+                        <div class="member-info">
+                            <h4>Power User (Station Manager)</h4>
+                            <div class="member-role">Starts Week 12</div>
+                            <div class="member-tasks">
+                                UAT testing, workflow validation, training feedback, real-world scenarios, edge case identification
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 1 DIVIDER -->
+        <div class="phase-divider">
+            <h2><span class="icon-silhouette icon-settings" style="width: 40px; height: 40px; margin-right: 16px; vertical-align: middle;"></span>PHASE 1: Foundation</h2>
+            <p>Weeks 1-4 • Core Infrastructure & Compliance Engine</p>
+        </div>
+
+        <!-- WEEK 1 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 1 • Project Kickoff & Foundation Setup</div>
+                <div class="sprint-dates">Days 1-7</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Establish complete development environment and infrastructure</li>
+                        <li>Secure all API credentials and system access from client</li>
+                        <li>Complete Amazon Portal API integration setup</li>
+                        <li>Initialize database schema for core compliance tracking</li>
+                        <li>Conduct kickoff meeting with all stakeholders</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Set up Render.com hosting, PostgreSQL database, initialize Git repository, create base React/TypeScript project structure</li>
+                        <li><strong>API Specialist:</strong> Research Amazon Logistics API documentation, create API authentication framework, set up OAuth flows for Microsoft Graph</li>
+                        <li><strong>UI/UX Designer:</strong> Create wireframes for compliance dashboard, design system color palette, establish component library foundation</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Amazon Portal API Credentials</div>
+                            <div class="deliverable-desc">API key, secret key, station IDs, DSP account access. Must have permissions for route data, scorecards, and invoices.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">ADP Workforce Now Access</div>
+                            <div class="deliverable-desc">Admin login credentials, API marketplace subscription, company code, payroll system configuration details.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Historical Compliance Data</div>
+                            <div class="deliverable-desc">Last 6 months of time card exports, breach history, CAP documentation, compliance audit results.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Organizational Chart & Processes</div>
+                            <div class="deliverable-desc">Current workflow documentation, approval hierarchies, communication channels (Teams/Slack), existing tool stack.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>DSP Owner (2 hours)</h5>
+                            <p>Kickoff meeting (90 min), strategic alignment session (30 min)</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>IT Admin (8 hours)</h5>
+                            <p>API credential gathering, system access provisioning, security review</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Operations Manager (4 hours)</h5>
+                            <p>Workflow documentation, compliance rule verification, historical data export</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>CFO (3 hours)</h5>
+                            <p>Financial system access, ADP setup, QuickBooks credentials prep</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 1 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Fully configured development, staging, and production environments</li>
+                        <li>PostgreSQL database with initial schema for drivers, routes, time cards</li>
+                        <li>Amazon Portal API successfully authenticated and pulling test data</li>
+                        <li>Project management board set up (Jira/Linear) with all 24 weeks mapped</li>
+                        <li>Weekly standup schedule established (Mon/Wed/Fri 15-min syncs)</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">Week 1 Milestone</div>
+                    <div class="milestone-text">✓ Foundation infrastructure live • All systems accessible • Team aligned</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- WEEK 2 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 2 • Compliance Engine Core Logic</div>
+                <div class="sprint-dates">Days 8-14</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Build rolling 60-hour / 7-day violation calculator engine</li>
+                        <li>Complete ADP API integration for live time card data</li>
+                        <li>Implement real-time alert notification system (SMS + Teams)</li>
+                        <li>Create compliance rules database with all Amazon regulations</li>
+                        <li>Build data pipeline for continuous ADP ↔ Amazon sync</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Design and code rolling window calculation algorithm, implement time series analysis for consecutive day tracking, build alert routing logic</li>
+                        <li><strong>API Specialist:</strong> Complete ADP Marketplace API integration, set up webhook listeners for real-time punch updates, build data transformation layer (ADP → database)</li>
+                        <li><strong>UI/UX Designer:</strong> Design compliance dashboard mockups, create alert notification templates (SMS/Teams/Email), prototype violation warning screens</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Complete Compliance Rules Documentation</div>
+                            <div class="deliverable-desc">All Amazon breach criteria: rolling 60/7 exact definition, meal break state laws (CA, WA, OR, etc.), rest period requirements, 6th consecutive day rules, overtime thresholds.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">ADP Time Card Data Samples</div>
+                            <div class="deliverable-desc">2 weeks of recent time card exports in CSV/XML, showing all punch types (regular, LP, break, etc.), edge cases (missing punches, corrections, transfers).</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Notification Preferences</div>
+                            <div class="deliverable-desc">Manager phone numbers for SMS, Teams webhook URLs, escalation hierarchy, after-hours notification protocols.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Historical Breach Examples</div>
+                            <div class="deliverable-desc">December 2024 Edwin Rodriguez breach details, any other CAPs/breaches from past 2 years with exact violation circumstances.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>Operations Manager (12 hours)</h5>
+                            <p>Compliance rules validation, edge case scenarios, workflow walkthroughs, test data verification</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>CFO (8 hours)</h5>
+                            <p>ADP API testing, data accuracy verification, time card format validation</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (2 hours)</h5>
+                            <p>Progress review, escalation policy approval, notification strategy signoff</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>IT Admin (4 hours)</h5>
+                            <p>Teams integration setup, SMS gateway configuration, firewall rules for webhooks</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-alert" style="width: 20px; height: 20px;"></span></span>Critical Path Items</h4>
+                    <div class="critical-path">
+                        <h5>Blockers That Will Delay Entire Project:</h5>
+                        <ul>
+                            <li>ADP API credentials incomplete or lacking permissions → Cannot proceed to Week 3</li>
+                            <li>Compliance rules ambiguous or incomplete → Cannot validate algorithm accuracy</li>
+                            <li>Historical breach data unavailable → Cannot test against known violations</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 2 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Rolling 60/7 calculator validated against historical breaches (100% accuracy)</li>
+                        <li>Live ADP data flowing into database (hourly sync working)</li>
+                        <li>Test alerts successfully sent to manager Teams/SMS</li>
+                        <li>Compliance rules engine processing real driver schedules</li>
+                        <li>Dashboard prototype showing active violations (design only)</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">Week 2 Milestone</div>
+                    <div class="milestone-text">✓ Compliance calculator operational • Real-time violation detection working</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- WEEK 3 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 3 • Meal Break Automation & Alert System</div>
+                <div class="sprint-dates">Days 15-21</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Build automated meal break detection from ADP punch patterns</li>
+                        <li>Create ADP-to-Flex synchronization logic for break enforcement</li>
+                        <li>Implement predictive violation warnings (2-3 days ahead)</li>
+                        <li>Complete compliance dashboard UI (front-end implementation)</li>
+                        <li>Set up automated compliance reporting (daily/weekly summaries)</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Build meal break pattern recognition ML model, implement predictive scheduling algorithm, create dashboard API endpoints</li>
+                        <li><strong>API Specialist:</strong> Develop Amazon Flex app integration for break push-out automation, build retry logic for failed API calls, implement rate limiting handlers</li>
+                        <li><strong>UI/UX Designer:</strong> Implement compliance dashboard in React, create interactive violation timeline view, design mobile-responsive layouts</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Amazon Flex App Admin Access</div>
+                            <div class="deliverable-desc">Login credentials for Flex management portal, permissions to push drivers in/out, station-level access controls.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Meal Break Policy Documentation</div>
+                            <div class="deliverable-desc">Exact timing rules (before 5th hour, 30-min minimum), state-specific variations, dinner break policies (20-min), current compliance rate data.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Current Manual Process Workflow</div>
+                            <div class="deliverable-desc">Step-by-step documentation of how managers currently push drivers out, timing coordination with dispatchers, typical edge cases encountered.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Test Driver Group</div>
+                            <div class="deliverable-desc">5-10 volunteer drivers for pilot testing break automation, consent forms, backup communication plan if automation fails.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>Operations Manager (15 hours)</h5>
+                            <p>Meal break workflow validation, Flex app testing, pilot driver coordination, edge case documentation</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Station Manager (10 hours)</h5>
+                            <p>Real-world pilot testing, driver communication, break timing coordination, feedback collection</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>IT Admin (3 hours)</h5>
+                            <p>Flex API access provisioning, mobile device testing, network connectivity verification</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (1 hour)</h5>
+                            <p>Progress review, pilot program approval</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 3 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Automated meal break detection working on live ADP data (90%+ accuracy)</li>
+                        <li>ADP-to-Flex sync successfully tested with pilot driver group</li>
+                        <li>Compliance dashboard fully functional (browse violations, drill-down details, export reports)</li>
+                        <li>Predictive warnings alerting 2-3 days before potential violations</li>
+                        <li>Daily compliance summary emails going to managers automatically</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">Week 3 Milestone</div>
+                    <div class="milestone-text">✓ Meal break compliance automation live • Dashboard operational • Predictive alerts working</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- WEEK 4 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 4 • Module 1 Completion & Validation</div>
+                <div class="sprint-dates">Days 22-28</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Complete comprehensive testing of Compliance Command Center (Module 1)</li>
+                        <li>Deploy to production and monitor for 1 week of live operation</li>
+                        <li>Validate 100% accuracy against historical breaches</li>
+                        <li>Train client team on compliance dashboard usage</li>
+                        <li>Document first measurable success metrics</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> End-to-end integration testing, performance optimization (sub-3-second dashboard load), error handling refinement, production deployment</li>
+                        <li><strong>API Specialist:</strong> Load testing API integrations (simulate 1000+ drivers), implement failover mechanisms, set up monitoring alerts (PagerDuty/Datadog)</li>
+                        <li><strong>UI/UX Designer:</strong> Final UI polish, accessibility compliance (WCAG 2.1), mobile optimization, create user guide screenshots</li>
+                        <li><strong>QA Engineer:</strong> First week on project – regression testing, edge case validation, create automated test suite</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">All Managers Onboarded</div>
+                            <div class="deliverable-desc">Complete list of all station managers, operations managers, and dispatchers who need dashboard access. Email addresses, phone numbers, role assignments.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Production Go-Live Approval</div>
+                            <div class="deliverable-desc">Formal signoff from DSP Owner to deploy to all stations, rollback plan agreed upon, escalation protocol for production issues.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Training Session Attendance</div>
+                            <div class="deliverable-desc">All managers attend 90-minute live training session, complete hands-on exercises, confirm understanding of alert protocols.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>All Managers (3 hours each)</h5>
+                            <p>Training session (90 min), hands-on practice (60 min), Q&A and workflow integration (30 min)</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Operations Manager (10 hours)</h5>
+                            <p>User acceptance testing, workflow validation, training preparation, go-live coordination</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (2 hours)</h5>
+                            <p>Final review, go-live approval, success criteria establishment</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>IT Admin (4 hours)</h5>
+                            <p>Production deployment support, monitoring setup, user account creation</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 4 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Module 1 (Compliance Command Center) deployed to production across all stations</li>
+                        <li>100% of managers trained and actively using dashboard</li>
+                        <li>Zero compliance violations for 7+ consecutive days (validated)</li>
+                        <li>Real-time alerts successfully preventing violations (documented cases)</li>
+                        <li>Automated test suite achieving 85%+ code coverage</li>
+                        <li>First monthly compliance report generated and delivered</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">🎉 PHASE 1 COMPLETE</div>
+                    <div class="milestone-text">Module 1 LIVE in Production • Zero Violations Achieved • Breach Prevention Operational</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PHASE 2 DIVIDER -->
+        <div class="phase-divider">
+            <h2><span class="icon-silhouette icon-doc" style="width: 40px; height: 40px; margin-right: 16px; vertical-align: middle;"></span>PHASE 2: Revenue Recovery</h2>
+            <p>Weeks 5-8 • Invoice Reconciliation & Revenue Optimization</p>
+        </div>
+
+        <!-- WEEK 5 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 5 • Multi-Window Reconciliation Engine</div>
+                <div class="sprint-dates">Days 29-35</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Build multi-window route tracking system for e-bike stations</li>
+                        <li>Implement route code deconfliction logic (same codes within day)</li>
+                        <li>Create cancellation detection and credit verification system</li>
+                        <li>Design invoice reconciliation database schema</li>
+                        <li>Build Amazon Portal invoice import automation</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Design reconciliation algorithm for 4-window daily operations, implement timestamp-based route deduplication, build discrepancy detection engine</li>
+                        <li><strong>API Specialist:</strong> Amazon Portal invoice API integration, Work Summary Tool data extraction, build automated invoice download scheduler (daily 6 AM run)</li>
+                        <li><strong>UI/UX Designer:</strong> Design revenue reconciliation dashboard, create window-by-window comparison views, mockup discrepancy alert screens</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Historical Invoice Data (6 months)</div>
+                            <div class="deliverable-desc">All Amazon invoices from past 6 months (PDF and CSV exports), scheduled vs actual route counts per day, known discrepancies with amounts.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">E-Bike Station Operation Details</div>
+                            <div class="deliverable-desc">Window schedules (exact start/end times), route code patterns per window, typical cancellation frequency, Flex vs rescue classification rules.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Current Vendor Process Documentation</div>
+                            <div class="deliverable-desc">Existing $1,250/month reconciliation vendor's process, what they catch vs miss, their reporting format, handoff workflow.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Route Pricing Structure</div>
+                            <div class="deliverable-desc">Payment per route by type (standard, Flex, rescue, XL, e-bike), cancellation credit amounts, adjustment invoice timing (when credits post).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>CFO (15 hours)</h5>
+                            <p>Invoice data extraction, vendor process documentation, reconciliation logic validation, pricing verification</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Operations Manager (8 hours)</h5>
+                            <p>E-bike window details, route code pattern documentation, edge case scenarios</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Station Manager (E-Bike) (6 hours)</h5>
+                            <p>Daily operation walkthrough, cancellation process, Flex pickup identification</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (1 hour)</h5>
+                            <p>Weekly progress review</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 5 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Multi-window reconciliation engine processing historical data (6 months backfill)</li>
+                        <li>Route code deconfliction working (handles duplicate codes across windows)</li>
+                        <li>Automated invoice import running daily from Amazon Portal</li>
+                        <li>Discrepancy detection identifying 10+ missed payments from historical data</li>
+                        <li>Database schema supporting all route types, windows, and payment tracking</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">Week 5 Milestone</div>
+                    <div class="milestone-text">✓ Invoice reconciliation engine operational • Historical discrepancies identified</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Continue with remaining weeks... Due to length, I'll create a pattern for the remaining weeks -->
+
+        <!-- WEEK 6 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 6 • Flex Classification & Auto-Dispute Generation</div>
+                <div class="sprint-dates">Days 36-42</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Build Flex vs rescue automatic classification logic</li>
+                        <li>Create automated dispute message generator for Chime</li>
+                        <li>Implement 2-day lag tracker for invoice posting delays</li>
+                        <li>Build payment tracking system (request → credit received)</li>
+                        <li>Design dispute workflow and approval process</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Build ML classifier for Flex vs rescue (package count, duration, route patterns), implement dispute tracking database, create approval workflow engine</li>
+                        <li><strong>API Specialist:</strong> Amazon Chime API integration for automated messaging, build dispute template system, implement adjustment invoice monitoring</li>
+                        <li><strong>UI/UX Designer:</strong> Design dispute review dashboard, create approval workflow UI, mockup payment tracking timeline view</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Flex vs Rescue Classification Rules</div>
+                            <div class="deliverable-desc">Exact criteria (package count thresholds, typical Flex pickup patterns), historical examples of each type, edge cases and exceptions.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Amazon Chime Account Access</div>
+                            <div class="deliverable-desc">Station communication channel IDs, Amazon representative contact info, historical dispute message examples (successful ones).</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Dispute Approval Authority</div>
+                            <div class="deliverable-desc">Who approves disputes before sending? Dollar thresholds requiring escalation? Tone/language preferences for Amazon communication?</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>CFO (12 hours)</h5>
+                            <p>Classification rule validation, dispute workflow design, historical dispute analysis, approval process definition</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Operations Manager (6 hours)</h5>
+                            <p>Flex pickup pattern documentation, Amazon communication best practices</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (2 hours)</h5>
+                            <p>Dispute approval authority delegation, escalation thresholds</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 6 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Flex vs rescue classifier achieving 95%+ accuracy on historical data</li>
+                        <li>Automated dispute messages generated for last 30 days of discrepancies</li>
+                        <li>Chime integration successfully sending test disputes to Amazon</li>
+                        <li>Dispute approval workflow operational (CFO reviews before sending)</li>
+                        <li>Payment tracking showing request → credit timeline for each dispute</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">Week 6 Milestone</div>
+                    <div class="milestone-text">✓ Automated dispute generation working • Flex classification accurate • Payment tracking live</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- WEEK 7 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 7 • Scorecard Optimization & Non-Revenue Detection</div>
+                <div class="sprint-dates">Days 43-49</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Build scorecard prediction engine (forecast weekly performance)</li>
+                        <li>Implement non-revenue driver detection algorithm</li>
+                        <li>Create scorecard bonus maximization recommendations</li>
+                        <li>Build weekly revenue optimization dashboard</li>
+                        <li>Integrate Netradyne API for safety scorecard correlation</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Build scorecard forecasting ML model (20+ Amazon metrics), implement non-revenue pattern recognition, create optimization recommendation engine</li>
+                        <li><strong>API Specialist:</strong> Netradyne API integration for safety data, scorecard data extraction from Amazon Portal, build historical scorecard database</li>
+                        <li><strong>UI/UX Designer:</strong> Design scorecard prediction dashboard, create weekly performance forecast views, mockup bonus optimization interface</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Historical Scorecard Data (12 months)</div>
+                            <div class="deliverable-desc">Weekly scorecard CSV exports, all 20+ metrics, bonus payouts received, Fantastic Plus/Fantastic rating thresholds, tier performance history.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Netradyne Admin Access</div>
+                            <div class="deliverable-desc">Login credentials for Netradyne portal, API key if available, safety violation export formats, camera assignment data.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Non-Revenue Driver Examples</div>
+                            <div class="deliverable-desc">Historical cases of drivers clocked in but not on route (standby paid but unused, training days, vehicle issues), typical weekly occurrence rate.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>Operations Manager (10 hours)</h5>
+                            <p>Scorecard metric explanation, non-revenue pattern validation, Netradyne process documentation</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>CFO (8 hours)</h5>
+                            <p>Bonus calculation verification, financial impact analysis, historical data extraction</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Safety Manager (4 hours)</h5>
+                            <p>Netradyne violation correlation, safety scorecard impact, camera incident review process</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 7 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Scorecard prediction engine forecasting next week's performance (80%+ accuracy)</li>
+                        <li>Non-revenue driver detection identifying 5-10 weekly cases automatically</li>
+                        <li>Netradyne safety data integrated into scorecard optimization</li>
+                        <li>Weekly revenue optimization dashboard showing potential gains</li>
+                        <li>Automated recommendations for hitting Fantastic Plus rating</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">Week 7 Milestone</div>
+                    <div class="milestone-text">✓ Scorecard optimization operational • Non-revenue detection working • Revenue dashboard live</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- WEEK 8 -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Week 8 • Module 2 Completion & Revenue Validation</div>
+                <div class="sprint-dates">Days 50-56</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Sprint Goals</h4>
+                    <ul class="task-list">
+                        <li>Complete end-to-end testing of Revenue Recovery Engine (Module 2)</li>
+                        <li>Validate revenue recovery against historical missed payments</li>
+                        <li>Deploy revenue optimization features to production</li>
+                        <li>Document first month of revenue recovered</li>
+                        <li>Train CFO and finance team on revenue dashboard</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-users" style="width: 20px; height: 20px;"></span></span>Development Team Activities</h4>
+                    <ul class="task-list">
+                        <li><strong>Lead Developer:</strong> Integration testing across all revenue modules, performance optimization, production deployment preparation</li>
+                        <li><strong>API Specialist:</strong> Load testing revenue data pipelines, failover testing for API outages, monitoring setup</li>
+                        <li><strong>UI/UX Designer:</strong> Final revenue dashboard polish, create financial reports, user training materials</li>
+                        <li><strong>QA Engineer:</strong> Regression testing, revenue calculation validation, automated test expansion</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Team Deliverables Required</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Finance Team Onboarding</div>
+                            <div class="deliverable-desc">CFO + accountants available for training session, access provisioning for financial dashboards, reporting preferences established.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Production Approval for Revenue Features</div>
+                            <div class="deliverable-desc">Formal signoff to begin automated dispute submissions to Amazon, approval thresholds configured, escalation protocols set.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment This Week</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>CFO (12 hours)</h5>
+                            <p>User acceptance testing, revenue validation, training session, go-live approval</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Finance Team (4 hours)</h5>
+                            <p>Dashboard training, reporting workflow, dispute monitoring</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (2 hours)</h5>
+                            <p>Revenue recovery review, Module 2 signoff, success metrics evaluation</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Week 8 Deliverables</h4>
+                    <ul class="task-list">
+                        <li>Module 2 (Revenue Recovery Engine) deployed to production</li>
+                        <li>$5,000+ in revenue recovered and documented (from historical discrepancies)</li>
+                        <li>Automated disputes successfully submitted and tracked</li>
+                        <li>Finance team trained and using revenue dashboard daily</li>
+                        <li>First monthly revenue optimization report delivered</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">🎉 PHASE 2 COMPLETE</div>
+                    <div class="milestone-text">Module 2 LIVE • $5K+ Revenue Recovered • Invoice Reconciliation Automated</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PHASE 3 DIVIDER -->
+        <div class="phase-divider">
+            <h2><span class="icon-silhouette icon-check" style="width: 40px; height: 40px; margin-right: 16px; vertical-align: middle;"></span>PHASE 3: Payroll Automation</h2>
+            <p>Weeks 9-12 • Time Card Compliance & Automated Corrections</p>
+        </div>
+
+        <!-- WEEK 9-12 Summary (abbreviated for space) -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Weeks 9-12 • Payroll Automation Suite (Module 3)</div>
+                <div class="sprint-dates">Days 57-84</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Phase 3 Goals</h4>
+                    <ul class="task-list">
+                        <li><strong>Week 9:</strong> Automated time card compliance audit UI, red/yellow/green gamification, one-click correction approval system</li>
+                        <li><strong>Week 10:</strong> Time card correction workflow, missing punch detection, auto-suggest LP classification, efficiency bonus calculator</li>
+                        <li><strong>Week 11:</strong> Schedule-to-ADP sync automation, TCMGR threshold tracker, manager manipulation detection, historical pattern learning</li>
+                        <li><strong>Week 12:</strong> Module 3 testing, production deployment, CFO training, validate 50+ hours/week time savings</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Deliverables Needed (Weeks 9-12)</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Current Payroll Process Documentation</div>
+                            <div class="deliverable-desc">Step-by-step workflow for Wednesday payroll audits, all 5+ compliance rules in Excel, typical time investment per week, common error patterns.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Historical Time Card Corrections</div>
+                            <div class="deliverable-desc">6 months of correction history: what was changed, why, frequency, categories (missing punch, wrong LP, meal break, etc.).</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Efficiency Bonus Calculation Rules</div>
+                            <div class="deliverable-desc">Exact formula for driver bonuses, thresholds, payout schedules, edge case handling.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment (Weeks 9-12)</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>CFO (40 hours total)</h5>
+                            <p>Process documentation, rule validation, weekly UAT, training delivery</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Operations Manager (30 hours total)</h5>
+                            <p>Workflow validation, correction pattern analysis, edge case testing</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Payroll Admin (20 hours total)</h5>
+                            <p>Real-world testing, parallel runs (AI vs manual), accuracy verification</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">🎉 PHASE 3 COMPLETE (Week 12)</div>
+                    <div class="milestone-text">Module 3 LIVE • 8-Hour Payroll Day Now 90 Seconds • 50+ Hours/Week Saved</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PHASE 4 DIVIDER -->
+        <div class="phase-divider">
+            <h2><span class="icon-silhouette icon-calendar" style="width: 40px; height: 40px; margin-right: 16px; vertical-align: middle;"></span>PHASE 4: Scheduling & Portal Intelligence</h2>
+            <p>Weeks 13-16 • Predictive Scheduling & Amazon Communication</p>
+        </div>
+
+        <!-- WEEK 13-16 Summary -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Weeks 13-16 • Modules 4 & 5 Implementation</div>
+                <div class="sprint-dates">Days 85-112</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Phase 4 Goals</h4>
+                    <ul class="task-list">
+                        <li><strong>Weeks 13-14:</strong> Smart standby recommendations, compliance pre-check scheduler, 6th-day blocking system, predictive peak season staffing</li>
+                        <li><strong>Weeks 15-16:</strong> Amazon Portal communication monitor, auto-response system, Work Summary Tool reconciliation, CAP/breach dispute automation</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Deliverables Needed (Weeks 13-16)</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Scheduling Process & Constraints</div>
+                            <div class="deliverable-desc">Current scheduling tool (DSPW/HERA?), typical advance notice, driver preferences, standby policies, peak season staffing patterns.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Amazon Communication History</div>
+                            <div class="deliverable-desc">Email inbox access (last 12 months), Chime message history, CAP notices, breach communications, typical response requirements.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment (Weeks 13-16)</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>Operations Manager (40 hours total)</h5>
+                            <p>Scheduling workflow validation, Amazon communication pattern analysis, testing</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>Station Managers (24 hours total)</h5>
+                            <p>Scheduling tool integration, standby recommendation validation</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">🎉 PHASE 4 COMPLETE (Week 16)</div>
+                    <div class="milestone-text">Modules 4 & 5 LIVE • Predictive Scheduling Active • Amazon Communication Automated</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PHASE 5 DIVIDER -->
+        <div class="phase-divider">
+            <h2><span class="icon-silhouette icon-brain" style="width: 40px; height: 40px; margin-right: 16px; vertical-align: middle;"></span>PHASE 5: Financial Suite & Smart Agent</h2>
+            <p>Weeks 17-20 • QuickBooks Integration & AI Chat Interface</p>
+        </div>
+
+        <!-- WEEK 17-20 Summary -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Weeks 17-20 • Modules 6 & 7 Implementation</div>
+                <div class="sprint-dates">Days 113-140</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Phase 5 Goals</h4>
+                    <ul class="task-list">
+                        <li><strong>Weeks 17-18:</strong> QuickBooks integration, labor percentage tracking, vendor ROI analysis, station-level P&L automation</li>
+                        <li><strong>Weeks 19-20:</strong> Smart Agent Chat perfection, multi-modal LLM routing, training feedback loop, meeting insights integration (Read.AI)</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Deliverables Needed (Weeks 17-20)</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">QuickBooks Admin Access</div>
+                            <div class="deliverable-desc">QuickBooks Online login, accountant access level, chart of accounts structure, labor expense categories, vendor payment history.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Financial Reporting Requirements</div>
+                            <div class="deliverable-desc">Desired financial metrics (labor % targets, P&L by station, vendor spend analysis), current reporting frequency, decision-making thresholds.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">AI Chat Training Data</div>
+                            <div class="deliverable-desc">Common questions managers ask, typical analysis requests, decision support scenarios, reporting preferences.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment (Weeks 17-20)</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>CFO (30 hours total)</h5>
+                            <p>QuickBooks integration, financial logic validation, AI chat training</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>All Managers (12 hours total)</h5>
+                            <p>AI chat testing, feedback on query responses, workflow integration</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">🎉 PHASE 5 COMPLETE (Week 20)</div>
+                    <div class="milestone-text">Modules 6 & 7 LIVE • AI Chat Answering 90%+ Queries • Complete Financial Visibility</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PHASE 6 DIVIDER -->
+        <div class="phase-divider">
+            <h2><span class="icon-silhouette icon-target" style="width: 40px; height: 40px; margin-right: 16px; vertical-align: middle;"></span>PHASE 6: Final Module & Launch</h2>
+            <p>Weeks 21-24 • Safety Intelligence & Production Readiness</p>
+        </div>
+
+        <!-- WEEK 21-24 Summary -->
+        <div class="sprint-container">
+            <div class="sprint-header">
+                <div class="sprint-title">Weeks 21-24 • Module 8 & Production Launch</div>
+                <div class="sprint-dates">Days 141-168</div>
+            </div>
+            <div class="sprint-content">
+                
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-target" style="width: 20px; height: 20px;"></span></span>Phase 6 Goals</h4>
+                    <ul class="task-list">
+                        <li><strong>Weeks 21-22:</strong> Netradyne pattern recognition, safety incident automation, driver behavior profiling, scorecard safety optimization</li>
+                        <li><strong>Week 23:</strong> End-to-end integration testing, performance optimization, security hardening, documentation completion</li>
+                        <li><strong>Week 24:</strong> Final production deployment, comprehensive training, go-live support, success metrics validation</li>
+                    </ul>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-doc" style="width: 20px; height: 20px;"></span></span>Client Deliverables Needed (Weeks 21-24)</h4>
+                    <div class="deliverable-list">
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Safety Program Documentation</div>
+                            <div class="deliverable-desc">Current safety coaching process, incident escalation workflows, Netradyne violation thresholds, driver improvement plans.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">Final Go-Live Approval</div>
+                            <div class="deliverable-desc">All 8 modules signed off, production deployment approval, launch communication plan, success criteria established.</div>
+                        </div>
+                        <div class="deliverable-item">
+                            <div class="deliverable-title">All Team Members Available for Training</div>
+                            <div class="deliverable-desc">Comprehensive training sessions (DSP owner, CFO, all managers, finance team, dispatchers), hands-on practice time, Q&A sessions.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-clock" style="width: 20px; height: 20px;"></span></span>Client Time Commitment (Weeks 21-24)</h4>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h5>Safety Manager (20 hours)</h5>
+                            <p>Safety module validation, Netradyne integration testing, coaching workflow setup</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>All Team Members (8 hours each)</h5>
+                            <p>Comprehensive platform training, hands-on exercises, workflow integration</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>DSP Owner (6 hours)</h5>
+                            <p>Final review, launch approval, success metrics signoff, stakeholder communication</p>
+                        </div>
+                        <div class="requirement-card">
+                            <h5>IT Admin (15 hours)</h5>
+                            <p>Production deployment support, user provisioning, monitoring setup, security review</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sprint-section">
+                    <h4><span class="section-icon"><span class="icon-silhouette icon-check" style="width: 20px; height: 20px;"></span></span>Final Deliverables (Week 24)</h4>
+                    <ul class="task-list">
+                        <li>All 8 modules deployed to production and fully operational</li>
+                        <li>100% of team members trained and actively using platform</li>
+                        <li>Zero compliance violations for 30+ consecutive days</li>
+                        <li>$20K+ revenue recovered and documented</li>
+                        <li>50+ hours/week time savings validated</li>
+                        <li>Complete documentation: user guides, technical docs, API references</li>
+                        <li>Automated monitoring and alerting fully configured</li>
+                        <li>Success metrics dashboard showing all KPIs green</li>
+                    </ul>
+                </div>
+
+                <div class="milestone">
+                    <div class="milestone-label">🎉🎉🎉 PROJECT COMPLETE 🎉🎉🎉</div>
+                    <div class="milestone-text">ALL 8 MODULES LIVE • Platform Fully Operational • Client Training Complete • Launch Successful</div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- SUCCESS METRICS SUMMARY -->
+        <div class="section" style="margin-top: 60px;">
+            <h2 class="section-title">Success Metrics & Validation</h2>
+            
+            <div style="background: white; padding: 40px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); margin-bottom: 32px;">
+                <h3 style="font-size: 24px; font-weight: 700; margin-bottom: 28px; color: var(--primary);">
+                    90-Day Validation Criteria (Post-Launch)
+                </h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;">
+                    <div style="text-align: center; padding: 24px; background: var(--bg-gray); border-radius: 12px;">
+                        <div style="margin-bottom: 12px;"><span class="icon-silhouette icon-check" style="width: 48px; height: 48px;"></span></div>
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Compliance</h4>
+                        <ul style="list-style: none; font-size: 14px; color: var(--text-light); text-align: left; line-height: 2;">
+                            <li>→ Zero violations 90+ days</li>
+                            <li>→ 100% meal break compliance</li>
+                            <li>→ Zero breaches/CAPs</li>
+                            <li>→ Audit-ready status</li>
+                        </ul>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: var(--bg-gray); border-radius: 12px;">
+                        <div style="margin-bottom: 12px;"><span class="icon-silhouette icon-doc" style="width: 48px; height: 48px;"></span></div>
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Revenue</h4>
+                        <ul style="list-style: none; font-size: 14px; color: var(--text-light); text-align: left; line-height: 2;">
+                            <li>→ $20K+ recovered (90 days)</li>
+                            <li>→ 100% invoice accuracy</li>
+                            <li>→ Scorecard optimized</li>
+                            <li>→ Zero missed payments</li>
+                        </ul>
+                    </div>
+
+                    <div style="text-align: center; padding: 24px; background: var(--bg-gray); border-radius: 12px;">
+                        <div style="margin-bottom: 12px;"><span class="icon-silhouette icon-settings" style="width: 48px; height: 48px;"></span></div>
+                        <h4 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text-dark);">Efficiency</h4>
+                        <ul style="list-style: none; font-size: 14px; color: var(--text-light); text-align: left; line-height: 2;">
+                            <li>→ 50+ hours weekly saved</li>
+                            <li>→ Payroll: 8 hours → 90 seconds</li>
+                            <li>→ 90%+ user satisfaction</li>
+                            <li>→ Daily active usage</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: linear-gradient(135deg, var(--success) 0%, #059669 100%); color: white; padding: 48px; border-radius: 16px; text-align: center;">
+                <h3 style="font-size: 32px; font-weight: 900; margin-bottom: 20px;">
+                    Total Value Created (Year 1)
+                </h3>
+                <div style="font-size: 72px; font-weight: 900; margin-bottom: 16px;">
+                    $683K - $967K
+                </div>
+                <div style="font-size: 18px; opacity: 0.95; margin-bottom: 32px;">
+                    Per DSP Deployment • Proven ROI from Real Operational Data
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; font-size: 15px;">
+                    <div>
+                        <div style="font-size: 36px; font-weight: 800; margin-bottom: 8px;">$200K+</div>
+                        <div style="opacity: 0.9;">Breach Prevention</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 36px; font-weight: 800; margin-bottom: 8px;">$175K+</div>
+                        <div style="opacity: 0.9;">Revenue Recovery</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 36px; font-weight: 800; margin-bottom: 8px;">$113K+</div>
+                        <div style="opacity: 0.9;">Time Savings</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 36px; font-weight: 800; margin-bottom: 8px;">$195K+</div>
+                        <div style="opacity: 0.9;">Other Modules</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div style="background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%); color: white; padding: 60px 0; margin-top: 80px;">
+        <div class="container" style="text-align: center;">
+            <h2 style="font-size: 42px; font-weight: 900; margin-bottom: 20px;">
+                Ready to Transform Your DSP Operations?
+            </h2>
+            <p style="font-size: 20px; opacity: 0.95; margin-bottom: 32px;">
+                6 months • 8 modules • Complete AI transformation<br>
+                From day one to full production deployment
+            </p>
+            <div style="font-size: 16px; opacity: 0.9;">
+                nBrain AI • danny@nbrain.ai • November 2025
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
